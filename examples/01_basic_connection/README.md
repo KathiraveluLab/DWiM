@@ -50,6 +50,11 @@ test data.
 If successful, you will see output in the command window similar to this
 (the Patient Name will match the data you uploaded):
 
---- DWiM Connection Test Start --- Attempting to connect to http://localhost:8042 ... Success! Connected to Orthanc. Found 1 studies.
+--- DWiM Connection Test Start ---
+Attempting to connect to http://localhost:8042 ...
+Success! Connected to Orthanc. Found 1 studies.
 
-Fetching metadata for first study (ID: e8a3c681...)... --- Successfully Retrieved Metadata --- Patient Name: GLIOMA01-i_03A6 --- DWiM Connection Test End ---
+Fetching metadata for first study (ID: e8a3c681...)... 
+--- Successfully Retrieved Metadata ---
+Patient Name: GLIOMA01-i_03A6
+--- DWiM Connection Test End ---
