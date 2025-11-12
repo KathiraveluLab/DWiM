@@ -19,16 +19,12 @@ function [studyList, studyMetadata] = connectToOrthanc(options)
 %   studyMetadata - Struct containing the metadata for the requested study.
 
 %   Input Arguments:
+%   Default connection & behavior settings
 arguments
-    % FIX #1: Hard-coded values moved here.
     options.BaseURL (1,1) string = "http://localhost:8042"
     options.User (1,1) string = "orthanc"
     options.Password (1,1) string = "orthanc"
-    
-    % FIX #4: 'Verbose' flag added to control printing.
     options.Verbose (1,1) logical = true
-    
-    % FIX #5: Optional 'StudyID' parameter added.
     options.StudyID (1,1) string = ""  % If empty, fetches the first study
 end
 
@@ -54,7 +50,7 @@ try
         'Timeout', 30 ...
     );
 catch ME
-    % FIX #3: Restore specific error check for missing toolboxes.
+    % This can fail if a required toolbox is missing
     if strcmp(ME.identifier, 'MATLAB:UndefinedFunction')
         fprintf('Error: Failed to create weboptions. Do you have the required toolboxes?\n');
         fprintf('This script requires MATLAB''s HTTP Interface.\n');
@@ -99,9 +95,9 @@ catch ME
 end
 
 %% --- 2. Fetch Metadata for the Requested Study ---
-targetStudyID = ''; % FIX #2: Initialize variable before the try block.
+targetStudyID = ''; % Initialize variable before the try block.
 try
-    % FIX #5: Logic to decide which study to fetch.
+    % Logic to decide which study to fetch.
     if options.StudyID == ""
         % Default behavior: get the first study
         targetStudyID = studyList{1};
