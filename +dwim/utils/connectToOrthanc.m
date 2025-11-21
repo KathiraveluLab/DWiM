@@ -1,6 +1,26 @@
 function [studyList, studyMetadata] = connectToOrthanc(options)
 %CONNECTTOORTHANC Connects to Orthanc and fetches study data.
-%   Uses default settings from dwim.config() unless overridden.
+%
+%   [studyList, studyMetadata] = dwim.utils.connectToOrthanc()
+%       Connects to the Orthanc server using default settings from dwim.config().
+%       Returns a list of all studies and the metadata for the first study.
+%
+%   [studyList, studyMetadata] = dwim.utils.connectToOrthanc('StudyID', 'id')
+%       Fetches metadata for the specific StudyID provided.
+%
+%   [...] = dwim.utils.connectToOrthanc(..., 'Verbose', false)
+%       Runs silently without printing status messages to the Command Window.
+%
+%   Name-Value Arguments:
+%       BaseURL  - (string) Override the default server URL.
+%       User     - (string) Override the default username.
+%       Password - (string) Override the default password.
+%       StudyID  - (string) ID of the specific study to fetch.
+%       Verbose  - (logical) Set to false to suppress output.
+%
+%   Outputs:
+%       studyList     - Cell array containing all available Study IDs.
+%       studyMetadata - Struct containing the DICOM metadata.
 
 %   Note: We call dwim.config() directly in the arguments block to ensure
 %   we always use the latest central defaults.
@@ -76,11 +96,12 @@ catch ME
             fprintf('Reason: %s\n', ME.message);
         end
     end
-    return; 
+    % Explicitly rethrow so the calling function knows it failed.
+    rethrow(ME);
 end
 
 %% --- 2. Fetch Metadata for the Requested Study ---
-targetStudyID = ''; % Initialize variable 
+targetStudyID = ''; 
 try
     if options.StudyID == ""
         targetStudyID = studyList{1};
@@ -111,6 +132,7 @@ catch ME
         fprintf('Error: Succeeded in fetching study list, but failed to get metadata for Study ID %s.\n', targetStudyID);
         fprintf('Reason: %s\n', ME.message);
     end
+    rethrow(ME);
 end
 
 if options.Verbose
