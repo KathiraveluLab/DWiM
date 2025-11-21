@@ -1,31 +1,16 @@
 function [studyList, studyMetadata] = connectToOrthanc(options)
 %CONNECTTOORTHANC Connects to Orthanc and fetches study data.
-%   [studyList, studyMetadata] = dwim.utils.connectToOrthanc()
-%   Connects to the default Orthanc server, gets a list of all studies,
-%   and fetches the metadata for the *first* study in the list.
-%
-%   [studyList, studyMetadata] = dwim.utils.connectToOrthanc('StudyID', 'xxxx')
-%   Connects to the default Orthanc server and fetches metadata for the
-%   specified StudyID.
-%
-%   [...] = dwim.utils.connectToOrthanc('Verbose', false)
-%   Connects silently without printing status messages to the console.
-%
-%   [...] = dwim.utils.connectToOrthanc('BaseURL', 'http://my.server:8080', ...)
-%   Specifies a custom server URL, user, and password.
-%
-%   Outputs:
-%   studyList - Cell array of study IDs available on the server.
-%   studyMetadata - Struct containing the metadata for the requested study.
+%   Uses default settings from dwim.config() unless overridden.
 
-%   Input Arguments:
-%   Default connection & behavior settings
+%   Note: We call dwim.config() directly in the arguments block to ensure
+%   we always use the latest central defaults.
+
 arguments
-    options.BaseURL (1,1) string = "http://localhost:8042"
-    options.User (1,1) string = "orthanc"
-    options.Password (1,1) string = "orthanc"
-    options.Verbose (1,1) logical = true
-    options.StudyID (1,1) string = ""  % If empty, fetches the first study
+    options.BaseURL (1,1) string = dwim.config().Orthanc.BaseURL
+    options.User (1,1) string = dwim.config().Orthanc.User
+    options.Password (1,1) string = dwim.config().Orthanc.Password
+    options.Verbose (1,1) logical = dwim.config().Defaults.Verbose
+    options.StudyID (1,1) string = "" 
 end
 
 %% --- Configuration ---
@@ -50,7 +35,7 @@ try
         'Timeout', 30 ...
     );
 catch ME
-    % This can fail if a required toolbox is missing
+    % Specific check for missing toolboxes
     if strcmp(ME.identifier, 'MATLAB:UndefinedFunction')
         fprintf('Error: Failed to create weboptions. Do you have the required toolboxes?\n');
         fprintf('This script requires MATLAB''s HTTP Interface.\n');
@@ -73,7 +58,7 @@ try
         if options.Verbose
             fprintf('Success! Connected to Orthanc, but no studies were found.\n');
         end
-        return; % Stop the function
+        return; 
     end
     
     if options.Verbose
@@ -91,21 +76,18 @@ catch ME
             fprintf('Reason: %s\n', ME.message);
         end
     end
-    return; % Stop the function
+    return; 
 end
 
 %% --- 2. Fetch Metadata for the Requested Study ---
-targetStudyID = ''; % Initialize variable before the try block.
+targetStudyID = ''; % Initialize variable 
 try
-    % Logic to decide which study to fetch.
     if options.StudyID == ""
-        % Default behavior: get the first study
         targetStudyID = studyList{1};
         if options.Verbose
             fprintf('Fetching metadata for first study (ID: %s)...\n', targetStudyID);
         end
     else
-        % User-specified behavior: get the requested study
         targetStudyID = options.StudyID;
         if options.Verbose
             fprintf('Fetching metadata for specified study (ID: %s)...\n', targetStudyID);
@@ -115,10 +97,8 @@ try
     studyMetadataURL = [orthancBaseURL, '/studies/', targetStudyID];
     studyMetadata = webread(studyMetadataURL, webOpts);
     
-    % --- 3. Display Key Information ---
     if options.Verbose
         fprintf('--- Successfully Retrieved Metadata ---\n');
-        
         if isfield(studyMetadata, 'PatientMainDicomTags') && isfield(studyMetadata.PatientMainDicomTags, 'PatientName')
             fprintf('Patient Name: %s\n', studyMetadata.PatientMainDicomTags.PatientName);
         else
