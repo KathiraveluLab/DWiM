@@ -28,14 +28,17 @@ function metadata = extractMetadata(filename)
               'The file "%s" was not found. Please check the path.', filename);
     end
 
-    % 2. Attempt to read DICOM metadata
+   % 2. Attempt to read DICOM metadata
     try
         metadata = dicominfo(filename);
     catch ME
-        % Wrap the error to give context, but pass the original message too.
-        error('dwim:extractMetadata:ReadFailed', ...
-              'Failed to read DICOM tags from "%s".\nReason: %s', ...
-              filename, ME.message);
+        % Create a custom exception
+        baseException = MException('dwim:extractMetadata:ReadFailed', ...
+            'Failed to read DICOM tags from "%s".', filename);
+        
+        % Add the original error as the "cause" so we don't lose the details
+        newException = addCause(baseException, ME);
+        
+        % Throw the combined exception
+        throw(newException);
     end
-
-end
