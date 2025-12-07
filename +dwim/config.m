@@ -17,9 +17,27 @@ function cfg = config()
 %       disp(settings.Orthanc.BaseURL);
 
     % Orthanc server configuration
-    cfg.Orthanc.BaseURL = "http://localhost:8042";
-    cfg.Orthanc.User = "orthanc";
-    cfg.Orthanc.Password = "orthanc";
+    % Load from environment variables with fallback defaults
+    baseURL = getenv('DWIM_ORTHANC_BASEURL');
+    if isempty(baseURL)
+        cfg.Orthanc.BaseURL = "http://localhost:8042";
+    else
+        cfg.Orthanc.BaseURL = string(baseURL);
+    end
+    
+    user = getenv('DWIM_ORTHANC_USER');
+    if isempty(user)
+        cfg.Orthanc.User = "orthanc";
+    else
+        cfg.Orthanc.User = string(user);
+    end
+    
+    password = getenv('DWIM_ORTHANC_PASSWORD');
+    if isempty(password)
+        cfg.Orthanc.Password = "orthanc";
+    else
+        cfg.Orthanc.Password = string(password);
+    end
     
     % Default behavior settings
     cfg.Defaults.Verbose = true;
