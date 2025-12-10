@@ -9,33 +9,11 @@ function conf = config()
     persistent cachedConf;
 
     if isempty(cachedConf)
-        % --- Orthanc Settings (Environment Variables with Fallbacks) ---
-        
-        % Attempt to read from secure environment variables first
-        envBaseURL = getenv('DWIM_ORTHANC_BASEURL');
-        envUser    = getenv('DWIM_ORTHANC_USER');
-        envPass    = getenv('DWIM_ORTHANC_PASSWORD');
-
-        % Apply defaults only if environment variables are not set
-        if isempty(envBaseURL)
-            cachedConf.Orthanc.BaseURL = "http://localhost:8042"; 
-        else
-            cachedConf.Orthanc.BaseURL = string(envBaseURL); 
-        end
-
-        if isempty(envUser)
-            % Default public credential for local Orthanc Docker instance
-            cachedConf.Orthanc.User = "orthanc"; 
-        else
-            cachedConf.Orthanc.User = string(envUser); 
-        end
-
-        if isempty(envPass)
-             % Default public credential for local Orthanc Docker instance
-            cachedConf.Orthanc.Password = "orthanc"; 
-        else
-            cachedConf.Orthanc.Password = string(envPass); 
-        end
+        % --- Orthanc Settings ---
+        % Use a helper to check environment variables 
+        cachedConf.Orthanc.BaseURL  = getEnvOrDefault('DWIM_ORTHANC_BASEURL', "http://localhost:8042");
+        cachedConf.Orthanc.User     = getEnvOrDefault('DWIM_ORTHANC_USER', "orthanc");
+        cachedConf.Orthanc.Password = getEnvOrDefault('DWIM_ORTHANC_PASSWORD', "orthanc");
 
         % --- Default Behaviors ---
         cachedConf.Defaults.Verbose = true;
@@ -43,4 +21,12 @@ function conf = config()
 
     % Return the cached configuration
     conf = cachedConf;
+end
+
+function val = getEnvOrDefault(envKey, defaultVal)
+%getEnvOrDefault Helper to read env var safely
+    val = string(getenv(envKey));
+    if val == ""
+        val = string(defaultVal);
+    end
 end
