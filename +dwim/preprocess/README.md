@@ -24,6 +24,21 @@ lungView = dwim.preprocess.applyWindowPreset(ctImage, 'lung');
 brainView = dwim.preprocess.applyWindowPreset(ctImage, 'brain');
 ```
 
+### `validateImageForML`
+Validate DICOM images for ML preprocessing suitability.
+
+```matlab
+% Basic validation
+[isValid, info] = dwim.preprocess.validateImageForML(ctImage);
+
+% Custom size requirements
+[isValid, info] = dwim.preprocess.validateImageForML(ctImage, 'MinSize', [256, 256]);
+
+if ~isValid
+    fprintf('Issues: %s\n', strjoin(info.issues, ', '));
+end
+```
+
 ## Standard Windowing Presets
 
 | Preset | Center (HU) | Width (HU) | Use Case |
