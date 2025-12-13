@@ -18,7 +18,6 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
 %       Method - Interpolation method (default: 'linear')
 %       VoxelSpacing - Original voxel spacing [x,y,z] in mm (default: [1,1,1])
 %       UseGPU - Use GPU acceleration if available (default: true)
-%       MaxMemoryGB - Maximum memory usage in GB (default: 4)
 %       Verbose - Display progress information (default: true)
 %
 %   Outputs:
@@ -84,11 +83,6 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
                 inputMemoryGB, outputMemoryGB, totalMemoryGB);
     end
     
-    useChunkedProcessing = totalMemoryGB > params.MaxMemoryGB;
-    if useChunkedProcessing && params.Verbose
-        fprintf('Using chunked processing (memory limit: %.1fGB)\n', params.MaxMemoryGB);
-    end
-    
     % GPU setup
     useGPU = params.UseGPU && canUseGPU();
     if useGPU && params.Verbose
@@ -102,29 +96,22 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
     originalClass = class(volume);
     volume = double(volume);  % Convert to double for processing
     
-    if useGPU && ~useChunkedProcessing
+    if useGPU
         volume = gpuArray(volume);
     end
     
     % Execute resampling
     try
-        if useChunkedProcessing
-            if params.Verbose
-                fprintf('Processing volume in chunks...\n');
-            end
-            resampled = resampleVolumeChunked(volume, outputSize, params.Method, params.Verbose);
-        else
-            if params.Verbose
-                fprintf('Resampling volume using %s interpolation...\n', params.Method);
-            end
-            resampled = imresize3(volume, outputSize, params.Method);
+        if params.Verbose
+            fprintf('Resampling volume using %s interpolation...\n', params.Method);
         end
+        resampled = imresize3(volume, outputSize, params.Method);
     catch ME
         resampled = handleResamplingError(ME, volume, outputSize, params);
     end
     
     % Post-processing
-    if useGPU && ~useChunkedProcessing
+    if useGPU
         resampled = gather(resampled);
     end
     
@@ -136,7 +123,7 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
     % Generate metadata
     processingTime = toc(processingTimer);
     metadata = generateMetadata(inputSize, outputSize, scaleFactor, targetSpacing, ...
-                               params, processingTime, useGPU, useChunkedProcessing);
+                               params, processingTime, useGPU);
     
     % Final validation and reporting
     validateOutput(resampled, outputSize, params.Verbose);
@@ -166,7 +153,6 @@ function [volume, params] = validateAndParseInputs(volume, varargin)
     addParameter(p, 'Method', 'linear', @validateMethod);
     addParameter(p, 'VoxelSpacing', [1, 1, 1], @validateVoxelSpacing);
     addParameter(p, 'UseGPU', true, @validateLogical);
-    addParameter(p, 'MaxMemoryGB', 4, @validateMaxMemory);
     addParameter(p, 'Verbose', true, @validateLogical);
     
     % Parse inputs
@@ -227,15 +213,6 @@ function isValid = validateLogical(value)
     end
 end
 
-function isValid = validateMaxMemory(memory)
-%VALIDATEMAXMEMORY Validate maximum memory parameter
-    isValid = isnumeric(memory) && isscalar(memory) && memory > 0;
-    if ~isValid
-        error('dwim:resampleVolume:InvalidMaxMemory', ...
-              'MaxMemoryGB must be a positive scalar');
-    end
-end
-
 function validateToolboxes()
 %VALIDATETOOLBOXES Check for required toolboxes
     if ~license('test', 'Image_Toolbox')
@@ -272,23 +249,9 @@ function available = canUseGPU()
     end
 end
 
-function resampled = resampleVolumeChunked(volume, outputSize, method, verbose)
-%RESAMPLEVOLUMEchunked Process large volumes in chunks
-    % This is a placeholder for chunked processing implementation
-    % For now, fall back to regular processing with warning
-    if verbose
-        fprintf('Warning: Chunked processing not yet implemented, using regular processing\n');
-    end
-    resampled = imresize3(volume, outputSize, method);
-end
-
 function resampled = handleResamplingError(ME, volume, outputSize, params)
 %HANDLERESAMPLINGERROR Handle resampling errors with fallback strategies
-    if contains(ME.message, 'memory') || contains(ME.message, 'Out of memory')
-        warning('dwim:resampleVolume:MemoryError', ...
-                'Memory error occurred, trying chunked processing');
-        resampled = resampleVolumeChunked(volume, outputSize, params.Method, params.Verbose);
-    elseif strcmp(params.Method, 'cubic')
+    if strcmp(params.Method, 'cubic')
         warning('dwim:resampleVolume:CubicFallback', ...
                 'Cubic interpolation failed, falling back to linear');
         resampled = imresize3(volume, outputSize, 'linear');
@@ -298,7 +261,7 @@ function resampled = handleResamplingError(ME, volume, outputSize, params)
 end
 
 function metadata = generateMetadata(inputSize, outputSize, scaleFactor, targetSpacing, ...
-                                   params, processingTime, useGPU, useChunkedProcessing)
+                                   params, processingTime, useGPU)
 %GENERATEMETADATA Create comprehensive metadata structure
     metadata = struct();
     metadata.originalSize = inputSize;
@@ -309,92 +272,6 @@ function metadata = generateMetadata(inputSize, outputSize, scaleFactor, targetS
     metadata.method = params.Method;
     metadata.processingTime = processingTime;
     metadata.usedGPU = useGPU;
-    metadata.usedChunkedProcessing = useChunkedProcessing;
-    metadata.volumeRatio = prod(outputSize) / prod(inputSize);
-end
-
-function validateOutput(resampled, expectedSize, verbose)
-%VALIDATEOUTPUT Perform final validation on output
-    % Check output dimensions
-    if ~isequal(size(resampled), expectedSize)
-        error('dwim:resampleVolume:OutputSizeMismatch', ...
-              'Output size mismatch: expected [%d %d %d], got [%d %d %d]', ...
-              expectedSize, size(resampled));
-    end
-    
-    % Check for non-finite values
-    if any(~isfinite(resampled(:)))
-        warning('dwim:resampleVolume:NonFiniteValues', ...
-                'Non-finite values detected in output');
-    end
-    
-    % Volume ratio warnings
-    volumeRatio = prod(size(resampled)) / prod(expectedSize);
-    if volumeRatio > 8 && verbose
-        warning('dwim:resampleVolume:LargeIncrease', ...
-                'Volume increased by %.1fx - verify target spacing', volumeRatio);
-    elseif volumeRatio < 0.125 && verbose
-        warning('dwim:resampleVolume:LargeDecrease', ...
-                'Volume decreased by %.1fx - possible information loss', 1/volumeRatio);
-    end
-                volumeSize);
-    end
-    
-    if any(volumeSize < 8)
-        warning('dwim:resampleVolume:SmallVolume', ...
-                'Very small volume detected: [%d %d %d]. Results may be poor.', ...
-                volumeSize);
-    end
-end
-
-function available = canUseGPU()
-%CANUSEGPU Check if GPU is available and suitable
-    try
-        gpuDevice();
-        available = true;
-    catch
-        available = false;
-    end
-end
-
-function resampled = resampleVolumeChunked(volume, outputSize, method, verbose)
-%RESAMPLEVOLUMEchunked Process large volumes in chunks
-    % This is a placeholder for chunked processing implementation
-    % For now, fall back to regular processing with warning
-    if verbose
-        fprintf('Warning: Chunked processing not yet implemented, using regular processing\n');
-    end
-    resampled = imresize3(volume, outputSize, method);
-end
-
-function resampled = handleResamplingError(ME, volume, outputSize, params)
-%HANDLERESAMPLINGERROR Handle resampling errors with fallback strategies
-    if contains(ME.message, 'memory') || contains(ME.message, 'Out of memory')
-        warning('dwim:resampleVolume:MemoryError', ...
-                'Memory error occurred, trying chunked processing');
-        resampled = resampleVolumeChunked(volume, outputSize, params.Method, params.Verbose);
-    elseif strcmp(params.Method, 'cubic')
-        warning('dwim:resampleVolume:CubicFallback', ...
-                'Cubic interpolation failed, falling back to linear');
-        resampled = imresize3(volume, outputSize, 'linear');
-    else
-        rethrow(ME);
-    end
-end
-
-function metadata = generateMetadata(inputSize, outputSize, scaleFactor, targetSpacing, ...
-                                   params, processingTime, useGPU, useChunkedProcessing)
-%GENERATEMETADATA Create comprehensive metadata structure
-    metadata = struct();
-    metadata.originalSize = inputSize;
-    metadata.resampledSize = outputSize;
-    metadata.originalSpacing = params.VoxelSpacing;
-    metadata.targetSpacing = targetSpacing;
-    metadata.scaleFactor = scaleFactor;
-    metadata.method = params.Method;
-    metadata.processingTime = processingTime;
-    metadata.usedGPU = useGPU;
-    metadata.usedChunkedProcessing = useChunkedProcessing;
     metadata.volumeRatio = prod(outputSize) / prod(inputSize);
 end
 
