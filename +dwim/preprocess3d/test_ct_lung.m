@@ -71,18 +71,31 @@ function test_ct_lung()
     try
         lungVolume = createCTLungVolume([64, 64, 32]);
         
-        % Apply lung windowing before resampling
-        lungWindowed = dwim.preprocess.applyWindowPreset(lungVolume(:,:,16), 'lung');
+        % Apply lung windowing to entire original volume
+        originalWindowed = zeros(size(lungVolume));
+        for i = 1:size(lungVolume, 3)
+            originalWindowed(:,:,i) = dwim.preprocess.applyWindowPreset(lungVolume(:,:,i), 'lung');
+        end
         
         [resampled, ~] = dwim.preprocess3d.resampleVolume(lungVolume, ...
             'TargetSpacing', 1.0, 'Verbose', false);
         
-        % Apply same windowing to resampled slice
-        resampledWindowed = dwim.preprocess.applyWindowPreset(resampled(:,:,round(end/2)), 'lung');
+        % Apply lung windowing to entire resampled volume
+        resampledWindowed = zeros(size(resampled));
+        for i = 1:size(resampled, 3)
+            resampledWindowed(:,:,i) = dwim.preprocess.applyWindowPreset(resampled(:,:,i), 'lung');
+        end
         
-        % Should preserve intensity characteristics
-        assert(abs(mean(lungWindowed(:)) - mean(resampledWindowed(:))) < 0.1, ...
-               'Lung windowing characteristics should be preserved');
+        % Compare full volume statistics
+        originalMean = mean(originalWindowed(:));
+        resampledMean = mean(resampledWindowed(:));
+        originalStd = std(originalWindowed(:));
+        resampledStd = std(resampledWindowed(:));
+        
+        assert(abs(originalMean - resampledMean) < 0.05, ...
+               'Windowed volume means should be similar');
+        assert(abs(originalStd - resampledStd) < 0.05, ...
+               'Windowed volume standard deviations should be similar');
         
         fprintf('PASSED\n');
     catch ME
