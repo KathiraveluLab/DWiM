@@ -4,6 +4,7 @@ function test_ct_lung()
 %   This test validates the resampleVolume function using CT lung-specific
 %   parameters and validates voxel spacing calculations.
 
+    rng('default'); % Seed the random number generator for reproducible tests
     fprintf('Testing CT Lung Series Resampling\n');
     fprintf('=================================\n');
     
