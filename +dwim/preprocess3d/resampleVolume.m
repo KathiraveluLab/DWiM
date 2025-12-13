@@ -74,13 +74,14 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
     end
     
     % Memory management assessment
-    inputMemoryGB = prod(inputSize) * 8 / 1e9;  % 8 bytes per double
-    outputMemoryGB = prod(outputSize) * 8 / 1e9;
-    totalMemoryGB = inputMemoryGB + outputMemoryGB;
+    volumeInfo = whos('volume');
+    inputMemoryGB = volumeInfo.bytes / 1e9;
+    outputMemoryGB = prod(outputSize) * 8 / 1e9;  % Output will be double
+    peakMemoryGB = inputMemoryGB + outputMemoryGB + inputMemoryGB;  % Input + Output + Double copy
     
     if params.Verbose
-        fprintf('Memory estimate: Input=%.1fGB, Output=%.1fGB, Total=%.1fGB\n', ...
-                inputMemoryGB, outputMemoryGB, totalMemoryGB);
+        fprintf('Memory estimate: Input=%.1fGB, Output=%.1fGB, Peak=%.1fGB\n', ...
+                inputMemoryGB, outputMemoryGB, peakMemoryGB);
     end
     
     % GPU setup
