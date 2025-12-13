@@ -11,15 +11,13 @@ This module extends DWiM's preprocessing capabilities to handle 3D/4D medical vo
 
 ### Core Functions
 - `resampleVolume.m` - Isotropic resampling of 3D volumes with GPU support
+- `test_ct_lung.m` - CT lung series testing and validation
+
+### Planned Functions (Future PRs)
 - `assembleVolume.m` - Build 3D volumes from DICOM series
 - `optimizePerformance.m` - Performance analysis and optimization
-
-### Testing Functions
 - `test_resampleVolume.m` - Unit tests for resampling function
 - `test_integration.m` - Integration tests for complete workflows
-
-### Research Files
-- `resampleVolume_pseudocode.m` - Implementation pseudo-code and documentation
 
 ## Quick Start
 
@@ -35,35 +33,20 @@ volume = rand(128, 128, 64) * 1000;  % Synthetic CT data
 fprintf('Processing time: %.2f seconds\n', metadata.processingTime);
 ```
 
-### Volume Assembly from DICOM
+### CT Lung Testing
 ```matlab
-% Assemble 3D volume from DICOM series
-[volume, metadata] = dwim.preprocess3d.assembleVolume('path/to/dicom/');
-
-% Then resample to isotropic spacing
-resampled = dwim.preprocess3d.resampleVolume(volume, 'TargetSpacing', 1.0);
-```
-
-### Performance Optimization
-```matlab
-% Analyze performance characteristics
-volume = rand(256, 256, 128, 'single');
-results = dwim.preprocess3d.optimizePerformance(volume);
-
-% View recommendations
-for i = 1:length(results.recommendations)
-    fprintf('%d. %s\n', i, results.recommendations{i});
-end
+% Test with CT lung parameters
+dwim.preprocess3d.test_ct_lung();
 ```
 
 ## Complete Workflow Example
 ```matlab
-% Step 1: Assemble volume from DICOM series
-[volume, assemblyMeta] = dwim.preprocess3d.assembleVolume('dicom_path/');
+% Step 1: Create or load 3D volume
+volume = rand(128, 128, 64) * 1000;  % Synthetic CT data
 
 % Step 2: Resample to isotropic spacing
-[resampled, resampleMeta] = dwim.preprocess3d.resampleVolume(volume, ...
-    'TargetSpacing', 1.0, 'UseGPU', true);
+[resampled, metadata] = dwim.preprocess3d.resampleVolume(volume, ...
+    'VoxelSpacing', [0.7, 0.7, 1.25], 'TargetSpacing', 1.0, 'UseGPU', true);
 
 % Step 3: Apply 2D preprocessing to each slice
 processed = zeros(size(resampled));
@@ -85,35 +68,18 @@ mlReady = imresize3(processed, [224, 224, 112]);  % Standard ML input size
 - **Data Type Preservation**: Maintains original data types
 - **Comprehensive Validation**: Input validation and error handling
 
-### Volume Assembly
-- **Flexible Sorting**: By slice location or instance number
-- **Spacing Validation**: Detects inconsistent slice spacing
-- **Gap Detection**: Identifies missing slices
-- **Metadata Extraction**: Comprehensive DICOM metadata handling
-
-### Performance Analysis
-- **Benchmarking**: CPU vs GPU performance comparison
-- **Method Comparison**: Speed/quality tradeoffs for interpolation methods
-- **Memory Analysis**: Memory usage estimation and optimization
-- **Scaling Analysis**: Performance across different volume sizes
-- **Recommendations**: Automated optimization suggestions
+### CT Lung Validation
+- **Realistic Parameters**: Tests with clinical CT lung spacing (0.7×0.7×1.25mm)
+- **Anisotropic Conversion**: Validates thick slice to isotropic resampling
+- **Windowing Preservation**: Ensures lung windowing characteristics are maintained
+- **Performance Testing**: Benchmarks with large clinical volumes
 
 ## Testing and Validation
 
-### Run Unit Tests
+### Run CT Lung Tests
 ```matlab
-% Test individual functions
-dwim.preprocess3d.test_resampleVolume();
-
-% Test complete workflows
-dwim.preprocess3d.test_integration();
-```
-
-### Performance Benchmarking
-```matlab
-% Quick performance test
-volume = rand(128, 128, 64);
-results = dwim.preprocess3d.optimizePerformance(volume, 'Verbose', true);
+% Test CT lung resampling scenarios
+dwim.preprocess3d.test_ct_lung();
 ```
 
 ## Integration with Existing Preprocessing
