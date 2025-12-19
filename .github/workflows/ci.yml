@@ -1,0 +1,33 @@
+name: DWiM CI Pipeline
+
+# Trigger only on changes to the dev branch
+on:
+  push:
+    branches: [ dev ]
+  pull_request:
+    branches: [ dev ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Run MATLAB Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Checkout the repository code
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Install MATLAB on the runner
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+
+      # Run the tests defined in the +dwim package
+      # The strict: true flag ensures any failure breaks the build
+      - name: Run Unit Tests
+        uses: matlab-actions/run-tests@v2
+        with:
+          source-folder: +dwim
+          select-by-folder: tests
+          test-results-junit: test-results/results.xml
+          strict: true
