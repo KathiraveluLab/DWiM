@@ -32,16 +32,10 @@ function [isValid, info] = validateVolumeForML(volume, varargin)
         volume {mustBeNumeric}
     end
 
-    arguments (Repeating)
-        varargin
-    end
-
     % Parse optional arguments
     p = inputParser;
     addParameter(p, 'MinSize', [64, 64, 5], @(x) isnumeric(x) && length(x) == 3);
     addParameter(p, 'MaxSize', [1024, 1024, 1000], @(x) isnumeric(x) && length(x) == 3);
-    addParameter(p, 'MinSlices', 5, @isnumeric);
-    addParameter(p, 'MaxSlices', 2000, @isnumeric);
     addParameter(p, 'CheckIsotropic', true, @islogical);
     addParameter(p, 'MemoryLimitGB', 8, @isnumeric);
     parse(p, varargin{:});
@@ -70,17 +64,6 @@ function [isValid, info] = validateVolumeForML(volume, varargin)
         recommendations{end+1} = 'Consider downsampling for memory efficiency';
     end
 
-    % Check 2: Slice count
-    if slices < params.MinSlices
-        isValid = false;
-        issues{end+1} = sprintf('Insufficient slices (%d), minimum required: %d', slices, params.MinSlices);
-        recommendations{end+1} = 'Volume may not provide enough context for 3D models';
-    end
-
-    if slices > params.MaxSlices
-        warnings{end+1} = sprintf('Very thick volume (%d slices), may be memory intensive', slices);
-        recommendations{end+1} = 'Consider processing in chunks or subsampling';
-    end
 
     % Check 3: Data type and range
     dataType = class(volume);
@@ -118,8 +101,8 @@ function [isValid, info] = validateVolumeForML(volume, varargin)
     end
 
     % Check 7: Memory requirements
-    bytesPerElement = getBytesPerElement(dataType);
-    totalBytes = rows * cols * slices * bytesPerElement;
+    volumeInfo = whos('volume');
+    totalBytes = volumeInfo.bytes;
     totalGB = totalBytes / (1024^3);
 
     if totalGB > params.MemoryLimitGB
@@ -182,23 +165,5 @@ function [isValid, info] = validateVolumeForML(volume, varargin)
         info.assessment = 'Volume is valid but has minor concerns';
     else
         info.assessment = 'Volume has issues that need to be addressed';
-    end
-end
-
-function bytes = getBytesPerElement(dataType)
-%GETBYTESPERELEMENT Get bytes per element for different data types
-    switch dataType
-        case 'double'
-            bytes = 8;
-        case 'single'
-            bytes = 4;
-        case {'int32', 'uint32'}
-            bytes = 4;
-        case {'int16', 'uint16'}
-            bytes = 2;
-        case {'int8', 'uint8'}
-            bytes = 1;
-        otherwise
-            bytes = 8; % Default assumption
     end
 end

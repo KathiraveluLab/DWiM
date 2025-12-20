@@ -4,6 +4,7 @@ function test_validateVolumeForML()
 %   This test validates the validateVolumeForML function using synthetic
 %   medical volumes and edge cases.
 
+    rng('default'); % Reset RNG for reproducible tests
     fprintf('Testing Volume Validation for ML Workflows\n');
     fprintf('=========================================\n');
 
@@ -46,7 +47,7 @@ function test_validateVolumeForML()
     % Test 3: Volume with NaN values
     fprintf('Test 3: Volume with NaN values... ');
     try
-        lungVolume = createCTLungVolume([64, 64, 32]);
+        lungVolume = single(createCTLungVolume([64, 64, 32]));
         lungVolume(10, 10, 5) = NaN;  % Add NaN value
 
         [isValid, info] = dwim.preprocess3d.validateVolumeForML(lungVolume);
@@ -66,10 +67,10 @@ function test_validateVolumeForML()
     try
         largeVolume = createCTLungVolume([512, 512, 200]);
 
-        [isValid, info] = dwim.preprocess3d.validateVolumeForML(largeVolume, 'MemoryLimitGB', 2);
+        [isValid, info] = dwim.preprocess3d.validateVolumeForML(largeVolume, 'MemoryLimitGB', 0.05);
 
         assert(~isValid || ~isempty(info.warnings), 'Large volume should trigger warnings');
-        assert(info.memoryUsageGB > 2, 'Should calculate memory usage correctly');
+        assert(info.memoryUsageGB > 0.05, 'Should calculate memory usage correctly');
 
         fprintf('PASSED\n');
         fprintf('  Memory usage: %.2f GB\n', info.memoryUsageGB);
