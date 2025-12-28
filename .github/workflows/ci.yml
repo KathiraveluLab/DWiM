@@ -1,6 +1,6 @@
 name: Run MATLAB Tests
 
-on: 
+on:
   push:
     branches: [ dev, main ]
   pull_request:
@@ -19,8 +19,8 @@ jobs:
       - name: Run Tests
         uses: matlab-actions/run-tests@v2
         with:
-          # We select by folder 'tests' because the package (+dwim) 
-          # is now in the root. This is more robust for CI.
+          # IMPORTANT: Include root (.) so the +dwim package is on the path
+          source-folder: .
           select-by-folder: tests
           test-results-junit: test-results/results.xml
 

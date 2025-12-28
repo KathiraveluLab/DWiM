@@ -1,6 +1,6 @@
 function flatS = flattenStruct(S, prefix)
     % FLATTENSTRUCT Recursively flattens a nested DICOM struct.
-    % Path: C:\Users\surya\DWiM\+dwim\+internal\flattenStruct.m
+    % Logic: Converts nested sequences into a single-level struct.
     
     if nargin < 2
         prefix = '';
@@ -13,7 +13,7 @@ function flatS = flattenStruct(S, prefix)
         fieldName = fields{i};
         value = S.(fieldName);
         
-        % Construct the new key name with dot-notation style underscore
+        % Generate the key name based on current prefix
         if isempty(prefix)
             newKey = fieldName;
         else
@@ -21,7 +21,7 @@ function flatS = flattenStruct(S, prefix)
         end
 
         if isstruct(value)
-            % Recursive call for nested structs
+            % Explicitly use full package path for recursive call
             subFlat = dwim.internal.flattenStruct(value, newKey);
             flatS = mergeStructs(flatS, subFlat);
             
@@ -30,19 +30,20 @@ function flatS = flattenStruct(S, prefix)
             for j = 1:numel(value)
                 if isstruct(value{j})
                     itemKey = sprintf('%s_Item%d', newKey, j);
+                    % Explicitly use full package path for recursive call
                     subFlat = dwim.internal.flattenStruct(value{j}, itemKey);
                     flatS = mergeStructs(flatS, subFlat);
                 end
             end
         else
-            % Base Case: Simple value (numeric, string, etc.)
+            % Base Case: Simple value
             flatS.(newKey) = value;
         end
     end
 end
 
 function A = mergeStructs(A, B)
-    % Helper to merge fields of struct B into A (Internal DRY utility)
+    % Internal helper to merge fields (DRY compliance)
     f = fieldnames(B);
     for i = 1:numel(f)
         A.(f{i}) = B.(f{i});
