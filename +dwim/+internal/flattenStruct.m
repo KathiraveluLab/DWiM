@@ -1,51 +1,58 @@
-function flatS = flattenStruct(S, prefix)
+function flats = flattenStruct(s, prefix)
     % FLATTENSTRUCT Recursively flattens a nested DICOM struct.
-    % Logic: Converts nested sequences into a single-level struct.
+    % Optimized for memory by using a nested helper function.
+
+    arguments
+        s (1,1) struct
+        prefix (1,1) string = ""
+    end
+
+    flats = struct();
     
-    if nargin < 2
-        prefix = '';
-    end
+    % Call the nested helper to populate the 'flats' struct in-place
+    populateFlatStruct(s, prefix);
 
-    flatS = struct();
-    fields = fieldnames(S);
-
-    for i = 1:numel(fields)
-        fieldName = fields{i};
-        value = S.(fieldName);
-        
-        % Generate the key name based on current prefix
-        if isempty(prefix)
-            newKey = fieldName;
-        else
-            newKey = sprintf('%s_%s', prefix, fieldName);
+    function populateFlatStruct(currents, currentPrefix)
+        % Handle empty structs early
+        if isempty(fieldnames(currents))
+            return;
         end
 
-        if isstruct(value)
-            % Explicitly use full package path for recursive call
-            subFlat = dwim.internal.flattenStruct(value, newKey);
-            flatS = mergeStructs(flatS, subFlat);
-            
-        elseif iscell(value)
-            % Handle DICOM Sequences (cell arrays of structs)
-            for j = 1:numel(value)
-                if isstruct(value{j})
-                    itemKey = sprintf('%s_Item%d', newKey, j);
-                    % Explicitly use full package path for recursive call
-                    subFlat = dwim.internal.flattenStruct(value{j}, itemKey);
-                    flatS = mergeStructs(flatS, subFlat);
-                end
+        fields = fieldnames(currents);
+
+        for i = 1:numel(fields)
+            fName = fields{i};
+            val = currents.(fName);
+
+            % Construct the new key name
+            if currentPrefix == ""
+                newKey = string(fName);
+            else
+                newKey = sprintf('%s_%s', currentPrefix, fName);
             end
-        else
-            % Base Case: Simple value
-            flatS.(newKey) = value;
-        end
-    end
-end
 
-function A = mergeStructs(A, B)
-    % Internal helper to merge fields (DRY compliance)
-    f = fieldnames(B);
-    for i = 1:numel(f)
-        A.(f{i}) = B.(f{i});
+            if isstruct(val)
+                % Handle both single structs and 1xN struct arrays
+                if numel(val) == 1
+                    populateFlatStruct(val, newKey);
+                else
+                    for k = 1:numel(val)
+                        itemKey = sprintf('%s_Item%d', newKey, k);
+                        populateFlatStruct(val(k), itemKey);
+                    end
+                end
+            elseif iscell(val)
+                % Handle DICOM Sequences (cell arrays of structs)
+                for j = 1:numel(val)
+                    if isstruct(val{j})
+                        itemKey = sprintf('%s_Item%d', newKey, j);
+                        populateFlatStruct(val{j}, itemKey);
+                    end
+                end
+            else
+                % Base Case: Simple value assignment
+                flats.(char(newKey)) = val;
+            end
+        end
     end
 end
