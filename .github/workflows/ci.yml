@@ -1,33 +1,32 @@
-name: DWiM CI Pipeline
+name: Run MATLAB Tests
 
-# Trigger on changes to dev AND your feature branch
-on:
+on: 
   push:
-    branches: [ dev, 'feat/**' ]
+    branches: [ dev, main ]
   pull_request:
-    branches: [ dev ]
-  workflow_dispatch:
+    branches: [ dev, main ]
 
 jobs:
-  build-and-test:
-    name: Run MATLAB Tests
+  run-tests:
     runs-on: ubuntu-latest
-    
     steps:
-      # Step 1: Checkout the repository code
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      # Step 2: Install MATLAB on the runner
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
 
-      # Step 3: Run the tests
-      # We use "." as source-folder so MATLAB sees the "+dwim" package correctly
-      - name: Run Unit Tests
+      - name: Run Tests
         uses: matlab-actions/run-tests@v2
         with:
-          source-folder: .
+          # We select by folder 'tests' because the package (+dwim) 
+          # is now in the root. This is more robust for CI.
           select-by-folder: tests
           test-results-junit: test-results/results.xml
-          strict: true
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/results.xml
