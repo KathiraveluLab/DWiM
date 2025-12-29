@@ -127,7 +127,11 @@ metadata = struct(...
     'orientationCorrection', struct(...),     % Orientation changes applied
     'resampling', struct(...),                % Resampling details
     'validation', struct(...),                % Quality check results
-    'totalTime', 12.34                        % Processing time in seconds
+    'totalTime', 12.34,                       % Processing time in seconds
+    % Optional DICOM patient/study fields (if available):
+    'patientName', 'Patient^Name',            % Patient identifier
+    'studyDescription', 'Study Description',  % Study description
+    'modality', 'CT'                          % Imaging modality
 );
 ```
 
@@ -232,8 +236,12 @@ normalizedVolumes = cellfun(@(x) normalizeVolume(x), trainingVolumes, 'UniformOu
 [volume, spacing, metadata] = dwim.preprocess3d.buildVolumeFromSeries(studyPath);
 
 % Extract patient info
-patientName = metadata.patientName;
-studyDate = metadata.studyDate;
+if isfield(metadata, 'patientName')
+    patientName = metadata.patientName;
+end
+if isfield(metadata, 'studyDescription')
+    studyDescription = metadata.studyDescription;
+end
 
 % Quality check
 if ~metadata.validation.isValid
