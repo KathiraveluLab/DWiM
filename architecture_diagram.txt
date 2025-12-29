@@ -42,7 +42,7 @@ Detailed Component Flow:
 │  └─────────────────┘                                                        │
 │         ↓                                                                   │
 │  ┌────────────────────┐                                                     │
-│  │ Volume Assembly    │  (assembleRawVolume)                                │
+│  │ Volume Assembly    │  (assembleVolume)                                   │
 │  │ • 3D Reconstruction│                                                     │
 │  │ • Error Handling   │                                                     │
 │  └────────────────────┘                                                     │
@@ -108,4 +108,4 @@ Output: 3D Volume Array + Voxel Spacing + Processing Metadata
 
 Volume: [rows × cols × slices] array
 Spacing: [x, y, z] in mm
-Metadata: Struct with processing details, timing, validation results
+Metadata: Struct with processing details, timing, validation results"" 

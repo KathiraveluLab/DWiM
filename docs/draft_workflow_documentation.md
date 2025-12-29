@@ -244,8 +244,8 @@ if isfield(metadata, 'studyDescription')
 end
 
 % Quality check
-if ~metadata.validation.isValid
-    warning('Volume failed validation: %s', strjoin(metadata.validation.issues, '; '));
+if metadata.validation.performed && ~metadata.validation.results.isValid
+    warning('Volume failed validation: %s', strjoin(metadata.validation.results.issues, '; '));
 end
 ```
 
@@ -265,4 +265,4 @@ end
 
 ---
 
-*This is a draft document. Please provide feedback on clarity, completeness, and additional topics to cover.*
+*This is a draft document. Please provide feedback on clarity, completeness, and additional topics to cover.*"" 

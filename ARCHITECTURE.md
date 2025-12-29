@@ -56,7 +56,6 @@ DICOM Series → Preprocessing → 3D Volume → ML Pipeline
 **Components:**
 - **Orientation:** `correctOrientation()` - Anatomical standardization
 - **Resampling:** `resampleVolume()` - Isotropic voxel spacing
-- **Optimization:** `optimizePerformance()` - Memory/performance tuning
 
 ### 5. ML Integration Stage
 **Output:** Ready-to-use 3D volumes for:
@@ -146,8 +145,7 @@ metadata = struct(...
 ### Modular Approach
 ```matlab
 % Step-by-step processing
-info = dwim.extractMetadata('dicom_folder/');
-volume = dwim.preprocess3d.assembleVolume('dicom_folder/');
+[volume, info] = dwim.preprocess3d.assembleVolume('dicom_folder/');
 volume = dwim.preprocess3d.correctOrientation(volume, info);
 [volume, ~] = dwim.preprocess3d.resampleVolume(volume);
 ```
