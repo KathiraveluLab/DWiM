@@ -1,43 +1,24 @@
-function metadata = extractMetadata(filename)
-%extractMetadata Extracts DICOM metadata from a specific file.
-%
-%   metadata = dwim.extractMetadata(filename)
-%       Reads the DICOM headers from the specified file path and returns 
-%       them as a structure using the standard dicominfo function.
-%
-%   Inputs:
-%       filename - (string) Full or relative path to the DICOM file.
-%
-%   Outputs:
-%       metadata - (struct) The raw DICOM tags returned by dicominfo.
-%
-%   Example:
-%       data = dwim.extractMetadata('test_data/image01.dcm');
-%       disp(data.PatientName);
-
-    % Validate inputs using an arguments block
+function metadata = extractMetadata(dicomPath)
+    % EXTRACTMETADATA Extracts and flattens DICOM metadata.
+    
     arguments
-        filename (1,1) string
+        % If no path is provided, use the default test image
+        dicomPath (1,1) string = fullfile(pwd, 'test_data', 'image01.dcm')
     end
 
-    % 1. Validate file existence
-    if ~isfile(filename)
-        error('dwim:extractMetadata:FileNotFound', ...
-              'The file "%s" was not found. Please check the path.', filename);
+    % Logic to ensure the file actually exists before proceeding
+    if ~exist(dicomPath, 'file')
+        error('DWiM:FileNotFound', 'The file %s does not exist.', dicomPath);
     end
 
-    % 2. Attempt to read DICOM metadata
-    try
-        metadata = dicominfo(filename);
-    catch ME
-        % Use MException and addCause to preserve stack trace
-        baseException = MException('dwim:extractMetadata:ReadFailed', ...
-            'Failed to read DICOM tags from "%s".', filename);
-        
-        % Link the original error so we don't lose the details
-        newException = addCause(baseException, ME);
-        
-        % Throw the combined exception
-        throw(newException);
+    % Safe Read (Week 7 Logic)
+    [rawInfo, status] = dwim.internal.readDicomSafe(dicomPath);
+    
+    if ~status.success
+        error('DWiM:ReadError', status.message);
     end
+
+    % Sanitize and Flatten (Week 6 & 7 Logic)
+    cleanInfo = dwim.internal.sanitizeMetadata(rawInfo);
+    metadata = dwim.internal.flattenStruct(cleanInfo);
 end
