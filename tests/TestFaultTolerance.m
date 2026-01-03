@@ -10,20 +10,18 @@ classdef TestFaultTolerance < matlab.unittest.TestCase
         end
 
         function testPrivateTagSanitization(testCase)
-            % Create a struct with a standard tag and a private tag
             raw = struct();
-            raw.PatientName = '  Anonymous  '; % Added spaces to test trimming
-            raw.Private_0019_1001 = 'Secret Data';
+            raw.PatientName = '  Anonymous  ';
+            % Test standard Private prefix
+            raw.Private_0019_1001 = 'Secret';
+            % Test odd group number format
+            raw.Group0011_Element1001 = 'Hidden';
             
             clean = dwim.internal.sanitizeMetadata(raw);
             
-            % Verify standard tag is kept and trimmed
-            testCase.verifyTrue(isfield(clean, 'PatientName'));
             testCase.verifyEqual(clean.PatientName, 'Anonymous');
-            
-            % Verify private tag is removed
-            testCase.verifyFalse(isfield(clean, 'Private_0019_1001'), ...
-                'Private tag was not stripped!');
+            testCase.verifyFalse(isfield(clean, 'Private_0019_1001'));
+            testCase.verifyFalse(isfield(clean, 'Group0011_Element1001'));
         end
     end
 end
