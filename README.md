@@ -15,6 +15,14 @@ DWiM provides a complete pipeline for processing DICOM series into analysis-read
 
 ### Quick Start
 
+#### Unified Pipeline (Recommended)
+```matlab
+% DICOM folder to ML-ready volume in one call
+config = struct('inputType', 'dicomdir', 'steps', {'assemble', 'orient', 'resample'});
+[volume, metadata] = dwim.preprocessPipeline('dicom_folder/', config);
+```
+
+#### Direct Volume Processing
 ```matlab
 % Process a DICOM series with full pipeline
 [volume, spacing, metadata] = dwim.preprocess3d.buildVolumeFromSeries('dicom_folder/');
@@ -31,6 +39,7 @@ See the `examples/` directory for detailed usage examples:
 - `01_basic_connection/`: DICOM server connections
 - `02_ml_preprocessing/`: 2D image preprocessing for ML
 - `03_volume_pipeline/`: Complete 3D volume processing pipeline
+- `04_unified_pipeline/`: Unified preprocessing for ML workflows
 
 ## Installation
 Clone the repository and add to MATLAB path:

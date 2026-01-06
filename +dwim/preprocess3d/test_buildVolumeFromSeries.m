@@ -88,25 +88,43 @@ function tempDir = createSyntheticDicomSeries()
     cols = 64;
 
     for i = 1:numSlices
-        % Create fake DICOM info
+        % Create DICOM info structure
         info = struct();
-        info.ImagePositionPatient = [0, 0, (i-1) * 5.0];  % 5mm spacing
-        info.ImageOrientationPatient = [1, 0, 0, 0, 1, 0];  % Axial
+        info.PatientName = 'Test Patient';
+        info.StudyInstanceUID = dicomuid();
+        info.SeriesInstanceUID = dicomuid();
+        info.SOPInstanceUID = dicomuid();
+        info.SOPClassUID = '1.2.840.10008.5.1.4.1.1.2'; % CT Image Storage
+        info.MediaStorageSOPClassUID = info.SOPClassUID;
+        info.MediaStorageSOPInstanceUID = info.SOPInstanceUID;
+        info.TransferSyntaxUID = '1.2.840.10008.1.2.1'; % Explicit VR Little Endian
+        info.ImplementationClassUID = '1.2.840.10008.5.1.4.1.1.2';
+        info.StudyDescription = 'Test Study';
+        info.SeriesDescription = 'Test Series';
+        info.Modality = 'CT';
+        info.Rows = rows;
+        info.Columns = cols;
+        info.BitsAllocated = 16;
+        info.BitsStored = 16;
+        info.HighBit = 15;
+        info.PixelRepresentation = 1; % signed
+        info.SamplesPerPixel = 1;
+        info.PhotometricInterpretation = 'MONOCHROME2';
         info.PixelSpacing = [1.0, 1.0];
         info.SliceThickness = 5.0;
-        info.PatientName = 'Test^Patient';
-        info.StudyDescription = 'Test Study';
-        info.Modality = 'CT';
+        info.ImagePositionPatient = [0, 0, (i-1) * 5.0];
+        info.ImageOrientationPatient = [1, 0, 0, 0, 1, 0];
+        info.RescaleIntercept = -1024;
+        info.RescaleSlope = 1;
+        info.RescaleType = 'HU';
 
         % Create synthetic image data
-        imageData = uint16(1000 + 500 * rand(rows, cols));  % CT-like values
+        imageData = int16(-1000 + 2000 * rand(rows, cols));  % CT-like HU values
 
         % Save as DICOM
         filename = sprintf('slice_%03d.dcm', i);
         filepath = fullfile(tempDir, filename);
 
-        % For testing, we'll create a minimal DICOM-like file
-        % In real scenarios, use dicomwrite
-        save(filepath, 'imageData', 'info');
+        dicomwrite(imageData, filepath, info, 'CreateMode', 'copy');
     end
 end
