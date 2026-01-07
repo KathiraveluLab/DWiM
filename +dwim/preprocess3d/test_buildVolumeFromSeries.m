@@ -78,6 +78,10 @@ end
 function tempDir = createSyntheticDicomSeries()
 %CREATESYNTHETICDICOMSERIES Create temporary directory with fake DICOM files
 
+    % DICOM UID constants
+    CT_IMAGE_STORAGE_UID = '1.2.840.10008.5.1.4.1.1.2';
+    EXPLICIT_VR_LE_UID = '1.2.840.10008.1.2.1';
+
     % Create temp directory
     tempDir = fullfile(tempdir, sprintf('dwiM_test_%d', randi(10000)));
     mkdir(tempDir);
@@ -86,19 +90,24 @@ function tempDir = createSyntheticDicomSeries()
     numSlices = 10;
     rows = 64;
     cols = 64;
+    sliceSpacing = 5.0;
+
+    % Generate series-level UIDs once (shared across all slices)
+    studyUID = dicomuid();
+    seriesUID = dicomuid();
 
     for i = 1:numSlices
         % Create DICOM info structure
         info = struct();
         info.PatientName = 'Test Patient';
-        info.StudyInstanceUID = dicomuid();
-        info.SeriesInstanceUID = dicomuid();
+        info.StudyInstanceUID = studyUID;
+        info.SeriesInstanceUID = seriesUID;
         info.SOPInstanceUID = dicomuid();
-        info.SOPClassUID = '1.2.840.10008.5.1.4.1.1.2'; % CT Image Storage
+        info.SOPClassUID = CT_IMAGE_STORAGE_UID; % CT Image Storage
         info.MediaStorageSOPClassUID = info.SOPClassUID;
         info.MediaStorageSOPInstanceUID = info.SOPInstanceUID;
-        info.TransferSyntaxUID = '1.2.840.10008.1.2.1'; % Explicit VR Little Endian
-        info.ImplementationClassUID = '1.2.840.10008.5.1.4.1.1.2';
+        info.TransferSyntaxUID = EXPLICIT_VR_LE_UID; % Explicit VR Little Endian
+        info.ImplementationClassUID = CT_IMAGE_STORAGE_UID;
         info.StudyDescription = 'Test Study';
         info.SeriesDescription = 'Test Series';
         info.Modality = 'CT';
@@ -111,8 +120,8 @@ function tempDir = createSyntheticDicomSeries()
         info.SamplesPerPixel = 1;
         info.PhotometricInterpretation = 'MONOCHROME2';
         info.PixelSpacing = [1.0, 1.0];
-        info.SliceThickness = 5.0;
-        info.ImagePositionPatient = [0, 0, (i-1) * 5.0];
+        info.SliceThickness = sliceSpacing;
+        info.ImagePositionPatient = [0, 0, (i-1) * sliceSpacing];
         info.ImageOrientationPatient = [1, 0, 0, 0, 1, 0];
         info.RescaleIntercept = -1024;
         info.RescaleSlope = 1;

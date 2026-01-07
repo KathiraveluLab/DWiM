@@ -18,7 +18,7 @@ DWiM provides a complete pipeline for processing DICOM series into analysis-read
 #### Unified Pipeline (Recommended)
 ```matlab
 % DICOM folder to ML-ready volume in one call
-config = struct('inputType', 'dicomdir', 'steps', {'assemble', 'orient', 'resample'});
+config = dwim.preprocessPipeline_config('inputType', 'dicomdir', 'steps', {'assemble', 'orient', 'resample'});
 [volume, metadata] = dwim.preprocessPipeline('dicom_folder/', config);
 ```
 

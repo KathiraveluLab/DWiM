@@ -203,6 +203,12 @@ function isValid = validateVoxelSpacing(spacing)
         error('dwim:resampleVolume:InvalidVoxelSpacing', ...
               'VoxelSpacing must be a 3-element vector of positive numbers');
     end
+
+    % Additional check for reasonable spacing range
+    if any(spacing < 0.01) || any(spacing > 100)
+        warning('dwim:resampleVolume:UnusualSpacing', ...
+                'Voxel spacing values seem unusual: [%g %g %g]. Expected range 0.01-100 mm.', spacing);
+    end
 end
 
 function isValid = validateLogical(value)
