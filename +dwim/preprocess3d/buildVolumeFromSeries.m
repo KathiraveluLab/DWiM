@@ -263,6 +263,11 @@ function [volume, assemblyInfo] = assembleRawVolume(sortedMetadata, verbose)
 
     assemblyInfo = struct('numSlices', numSlices, 'dimensions', [rows, cols, numSlices], ...
                          'dataType', class(volume));
+
+    % Validation: Check for empty volume
+    if isempty(volume) || all(volume(:) == 0)
+        error('dwim:buildVolumeFromSeries:EmptyVolume', 'Assembled volume is empty or all zeros');
+    end
 end
 
 function voxelSpacing = extractVoxelSpacing(sortedMetadata)
@@ -365,6 +370,12 @@ function metadata = generateBuildMetadata(dicomPath, params, dicomFiles, sortedM
         end
         if isfield(firstInfo, 'Modality')
             metadata.modality = firstInfo.Modality;
+
+            % Validation: Check modality is CT
+            if ~strcmpi(firstInfo.Modality, 'CT')
+                error('dwim:buildVolumeFromSeries:NonCTModality', ...
+                      'Input DICOM series is not CT modality: %s', firstInfo.Modality);
+            end
         end
     end
 end

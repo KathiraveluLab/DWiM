@@ -63,6 +63,27 @@ function test_buildVolumeFromSeries()
 
         fprintf('PASSED\n');
 
+        % Test 5: Edge case - Non-CT modality
+        fprintf('Test 5: Edge case - Non-CT modality... ');
+        tempDirMR = createSyntheticDicomSeries('Modality', 'MR');
+
+        try
+            [volume5, spacing5, metadata5] = dwim.preprocess3d.buildVolumeFromSeries(tempDirMR, ...
+                'Verbose', false);
+            fprintf('FAILED - Should have thrown error for non-CT modality\n');
+            assert(false, 'Should have failed for non-CT modality');
+        catch ME
+            if strcmp(ME.identifier, 'dwim:buildVolumeFromSeries:NonCTModality')
+                fprintf('PASSED - Correctly rejected non-CT modality\n');
+            else
+                fprintf('FAILED - Unexpected error: %s\n', ME.identifier);
+                rethrow(ME);
+            end
+        end
+
+        % Cleanup MR directory
+        rmdir(tempDirMR, 's');
+
         fprintf('==============================\n');
         fprintf('All volume builder tests passed!\n');
 
@@ -75,8 +96,14 @@ function test_buildVolumeFromSeries()
     rmdir(tempDir, 's');
 end
 
-function tempDir = createSyntheticDicomSeries()
+function tempDir = createSyntheticDicomSeries(varargin)
 %CREATESYNTHETICDICOMSERIES Create temporary directory with fake DICOM files
+
+    % Parse arguments
+    p = inputParser;
+    addParameter(p, 'Modality', 'CT', @ischar);
+    parse(p, varargin{:});
+    modality = p.Results.Modality;
 
     % Create temp directory
     tempDir = fullfile(tempdir, sprintf('dwiM_test_%d', randi(10000)));
@@ -96,7 +123,7 @@ function tempDir = createSyntheticDicomSeries()
         info.SliceThickness = 5.0;
         info.PatientName = 'Test^Patient';
         info.StudyDescription = 'Test Study';
-        info.Modality = 'CT';
+        info.Modality = modality;
 
         % Create synthetic image data
         imageData = uint16(1000 + 500 * rand(rows, cols));  % CT-like values

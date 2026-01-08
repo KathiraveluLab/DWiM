@@ -163,6 +163,7 @@ function [volume, params] = validateAndParseInputs(volume, varargin)
     % Additional validation
     validateToolboxes();
     validateVolumeSize(volume);
+    validateSpacingRange(params.VoxelSpacing);
 end
 
 function isValid = validateVolumeInput(volume)
@@ -225,18 +226,26 @@ end
 function validateVolumeSize(volume)
 %VALIDATEVOLUMESIZE Additional volume size validation
     volumeSize = size(volume);
-    
+
     % Check for reasonable dimensions
     if any(volumeSize > 4096)
         warning('dwim:resampleVolume:LargeVolume', ...
                 'Very large volume detected: [%d %d %d]. Processing may be slow.', ...
                 volumeSize);
     end
-    
+
     if any(volumeSize < 8)
         warning('dwim:resampleVolume:SmallVolume', ...
                 'Very small volume detected: [%d %d %d]. Results may be poor.', ...
                 volumeSize);
+    end
+end
+
+function validateSpacingRange(spacing)
+%VALIDATESPACINGRANGE Validate spacing values are in reasonable range
+    if any(spacing < 0.01) || any(spacing > 100)
+        warning('dwim:resampleVolume:UnusualSpacing', ...
+                'Voxel spacing values seem unusual: [%g %g %g]. Expected range 0.01-100 mm.', spacing);
     end
 end
 
