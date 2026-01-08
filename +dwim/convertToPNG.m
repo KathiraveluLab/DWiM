@@ -151,12 +151,17 @@ end
 function imgOut = applyWindowing(img, winCenter, winWidth)
 %applyWindowing Apply window/level transform to image.
 
-    % Calculate window boundaries
-    winMin = winCenter - winWidth / 2;
-    winMax = winCenter + winWidth / 2;
+    % Handle zero or negative width window to avoid division by zero
+    if winWidth <= 0
+        imgOut = double(img >= winCenter);
+    else
+        % Calculate window boundaries
+        winMin = winCenter - winWidth / 2;
+        winMax = winCenter + winWidth / 2;
 
-    % Apply linear windowing
-    imgOut = (img - winMin) / (winMax - winMin);
+        % Apply linear windowing
+        imgOut = (img - winMin) / (winMax - winMin);
+    end
 
     % Clamp to [0, 1]
     imgOut = max(0, min(1, imgOut));
