@@ -87,10 +87,11 @@ function outputPath = convertToPNG(inputFile, outputDir, options)
     end
 
     % 9. Convert to output bit depth
+    maxValue = 2^options.BitDepth - 1;
     if options.BitDepth == 8
-        imgOut = uint8(imgWindowed * 255);
+        imgOut = uint8(imgWindowed * maxValue);
     else
-        imgOut = uint16(imgWindowed * 65535);
+        imgOut = uint16(imgWindowed * maxValue);
     end
 
     % 10. Generate output filename
