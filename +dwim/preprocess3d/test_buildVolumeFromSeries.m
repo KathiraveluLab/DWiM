@@ -78,6 +78,10 @@ end
 function tempDir = createSyntheticDicomSeries()
 %CREATESYNTHETICDICOMSERIES Create temporary directory with fake DICOM files
 
+    % DICOM UID constants
+    CT_IMAGE_STORAGE_UID = '1.2.840.10008.5.1.4.1.1.2';
+    EXPLICIT_VR_LE_UID = '1.2.840.10008.1.2.1';
+
     % Create temp directory
     tempDir = fullfile(tempdir, sprintf('dwiM_test_%d', randi(10000)));
     mkdir(tempDir);
@@ -86,27 +90,50 @@ function tempDir = createSyntheticDicomSeries()
     numSlices = 10;
     rows = 64;
     cols = 64;
+    sliceSpacing = 5.0;
+
+    % Generate series-level UIDs once (shared across all slices)
+    studyUID = dicomuid();
+    seriesUID = dicomuid();
 
     for i = 1:numSlices
-        % Create fake DICOM info
+        % Create DICOM info structure
         info = struct();
-        info.ImagePositionPatient = [0, 0, (i-1) * 5.0];  % 5mm spacing
-        info.ImageOrientationPatient = [1, 0, 0, 0, 1, 0];  % Axial
-        info.PixelSpacing = [1.0, 1.0];
-        info.SliceThickness = 5.0;
-        info.PatientName = 'Test^Patient';
+        info.PatientName = 'Test Patient';
+        info.StudyInstanceUID = studyUID;
+        info.SeriesInstanceUID = seriesUID;
+        info.SOPInstanceUID = dicomuid();
+        info.SOPClassUID = CT_IMAGE_STORAGE_UID; % CT Image Storage
+        info.MediaStorageSOPClassUID = info.SOPClassUID;
+        info.MediaStorageSOPInstanceUID = info.SOPInstanceUID;
+        info.TransferSyntaxUID = EXPLICIT_VR_LE_UID; % Explicit VR Little Endian
+        info.ImplementationClassUID = CT_IMAGE_STORAGE_UID;
         info.StudyDescription = 'Test Study';
+        info.SeriesDescription = 'Test Series';
         info.Modality = 'CT';
+        info.Rows = rows;
+        info.Columns = cols;
+        info.BitsAllocated = 16;
+        info.BitsStored = 16;
+        info.HighBit = 15;
+        info.PixelRepresentation = 1; % signed
+        info.SamplesPerPixel = 1;
+        info.PhotometricInterpretation = 'MONOCHROME2';
+        info.PixelSpacing = [1.0, 1.0];
+        info.SliceThickness = sliceSpacing;
+        info.ImagePositionPatient = [0, 0, (i-1) * sliceSpacing];
+        info.ImageOrientationPatient = [1, 0, 0, 0, 1, 0];
+        info.RescaleIntercept = -1024;
+        info.RescaleSlope = 1;
+        info.RescaleType = 'HU';
 
         % Create synthetic image data
-        imageData = uint16(1000 + 500 * rand(rows, cols));  % CT-like values
+        imageData = int16(-1000 + 2000 * rand(rows, cols));  % CT-like HU values
 
         % Save as DICOM
         filename = sprintf('slice_%03d.dcm', i);
         filepath = fullfile(tempDir, filename);
 
-        % For testing, we'll create a minimal DICOM-like file
-        % In real scenarios, use dicomwrite
-        save(filepath, 'imageData', 'info');
+        dicomwrite(imageData, filepath, info, 'CreateMode', 'copy');
     end
 end
