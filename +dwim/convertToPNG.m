@@ -50,9 +50,11 @@ function outputPath = convertToPNG(inputFile, outputDir, options)
 
     % 2. Set default output directory to input file's directory
     if outputDir == ""
-        outputDir = fileparts(inputFile);
-        if outputDir == ""
-            outputDir = pwd;
+        path = fileparts(inputFile);
+        if path == ""
+            outputDir = string(pwd);
+        else
+            outputDir = string(path);
         end
     end
 
