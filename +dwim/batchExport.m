@@ -5,34 +5,33 @@ function T = batchExport(inputFolder)
         inputFolder (1,1) string = pwd
     end
 
-    % 1. Use absolute paths to satisfy Bot standards
+    % FIX: Machine-agnostic absolute path check
     if ~java.io.File(char(inputFolder)).isAbsolute()
         inputFolder = fullfile(pwd, inputFolder);
     end
 
-    % 2. Get list of all DCM files
+    % Get list of all DCM files
     files = dir(fullfile(inputFolder, '*.dcm'));
     if isempty(files)
         error('DWiM:NoFiles', 'No DICOM files found in %s', inputFolder);
     end
 
-    fprintf('Processing %d files...\n', numel(files));
-    allMetadata = cell(numel(files), 1);
+    numFiles = numel(files);
+    allMetadata = cell(numFiles, 1);
 
-    % 3. Loop through files using the Week 7 Safe Extraction
-    for i = 1:numel(files)
+    % BOT FIX: Use parfor for multi-core performance and capture ME for logging
+    % Note: If Parallel Toolbox is missing, this automatically runs as a standard loop.
+    parfor i = 1:numFiles
         currentFile = fullfile(files(i).folder, files(i).name);
         try
-            % This calls your extractMetadata which now handles sanitization/flattening
             allMetadata{i} = dwim.extractMetadata(currentFile);
-        catch
-            warning('DWiM:BatchWarning', 'Skipping corrupt file: %s', files(i).name);
-            allMetadata{i} = struct(); % Placeholder for failed files
+        catch ME
+            % BOT FIX: Include the specific error message for easier debugging
+            warning('DWiM:BatchWarning', 'Skipping %s. Reason: %s', files(i).name, ME.message);
+            allMetadata{i} = struct(); 
         end
     end
 
-    % 4. Convert Cell Array of Structs to a Table
-    % This handles varying fields across different DICOM files
+    % Convert to Table (using 'AsArray' to handle diverse field sets)
     T = struct2table(allMetadata, 'AsArray', true);
-    fprintf('Export Complete. Table generated with %d rows.\n', height(T));
 end
