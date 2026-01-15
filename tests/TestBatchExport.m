@@ -1,25 +1,32 @@
 classdef TestBatchExport < matlab.unittest.TestCase
+    % TESTBATCHEXPORT Final verification for Module A.
+
     methods(Test)
         function testTableGeneration(testCase)
-            testFolder = fullfile(pwd, 'test_data');
+            % Discover test_data relative to this test file
+            testFileDir = fileparts(mfilename('fullpath'));
+            projectRoot = fileparts(testFileDir);
+            testFolder = fullfile(projectRoot, 'test_data');
             
-            % Run the batch export
+            % Ensure folder exists before proceeding
+            testCase.assumeTrue(exist(testFolder, 'dir') == 7, ...
+                ['Folder missing at: ', char(testFolder)]);
+
+            % Run batch export
             T = dwim.batchExport(testFolder);
             
-            % BOT FIX: Verify EXACT row count matches file count
-            numDicomFiles = numel(dir(fullfile(testFolder, '*.dcm')));
-            testCase.verifyEqual(height(T), numDicomFiles, ...
-                'The table row count must match the number of DICOM files.');
+            % BOT FIX: Strict row count validation
+            expectedCount = numel(dir(fullfile(testFolder, '*.dcm')));
+            testCase.verifyEqual(height(T), expectedCount, ...
+                'Table height must match number of DICOM files.');
 
-            % BOT FIX: Comprehensive validation of flattened headers
+            % BOT FIX: Validate flattened header structure
             vars = T.Properties.VariableNames;
-            testCase.verifyTrue(any(strcmp(vars, 'PatientName')), 'Missing top-level header.');
+            testCase.verifyTrue(any(strcmp(vars, 'PatientName')), 'Missing PatientName.');
             
-            % Check for potential flattened sequence items
-            hasSequence = any(contains(vars, 'Sequence_Item'));
-            if hasSequence
-                 testCase.verifyTrue(hasSequence, 'Recursive flattening failed in batch mode.');
-            end
+            % Verify recursive flattening occurred
+            testCase.verifyTrue(any(contains(vars, 'Item')), ...
+                'Recursive flattening failed to produce Item-level columns.');
         end
     end
 end
