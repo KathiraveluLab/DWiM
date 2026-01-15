@@ -3,7 +3,7 @@ function [info, status] = readDicomSafe(filePath)
         filePath (1,1) string
     end
 
-    % Use java.io.File for robust cross-platform path check
+    % Use java.io.File for robust path detection
     if ~java.io.File(char(filePath)).isAbsolute()
         filePath = fullfile(pwd, filePath);
     end
@@ -13,10 +13,15 @@ function [info, status] = readDicomSafe(filePath)
 
     try
         if ~exist(filePath, 'file')
-            error('File not found: %s', filePath);
+            error('DWiM:FileNotFound', 'File not found: %s', filePath);
         end
-        % Use char() for older MATLAB toolbox compatibility
-        info = dicominfo(char(filePath));
+        
+        % Check for toolbox presence to avoid Undefined Function errors
+        if isempty(which('dicominfo'))
+            error('DWiM:ToolboxMissing', 'Image Processing Toolbox (dicominfo) is not installed.');
+        end
+        
+        info = dicominfo(char(filePath)); % Explicit char for older versions
     catch ME
         status.success = false;
         status.message = string(ME.message);
