@@ -5,31 +5,33 @@ function T = batchExport(inputFolder)
 
     % Path Discovery
     if inputFolder == ""
-        root = fileparts(fileparts(mfilename('fullpath')));
-        inputFolder = fullfile(root, 'test_data');
+        packagePath = fileparts(mfilename('fullpath'));
+        projectRoot = fileparts(packagePath);
+        inputFolder = fullfile(projectRoot, 'test_data');
     end
 
     files = dir(fullfile(inputFolder, '*.dcm'));
     numFiles = numel(files);
     allMetadata = cell(numFiles, 1);
 
-    % Use parfor for performance
+    % Performance Optimization: Parallel Loop
     parfor i = 1:numFiles
         currentFile = fullfile(files(i).folder, files(i).name);
         try
             allMetadata{i} = dwim.extractMetadata(currentFile);
         catch ME
-            % Log specific error message
             warning('DWiM:BatchWarning', 'Skipping %s: %s', files(i).name, ME.message);
             allMetadata{i} = struct(); 
         end
     end
 
-    % FIX: Convert cell array of structs to a struct array safely
-    structArray = [allMetadata{:}];
-    if isempty(structArray)
+    % Convert to Table (Safe handling of diverse fields)
+    % Filter out any empty entries before conversion
+    validEntries = allMetadata(~cellfun(@isempty, allMetadata));
+    if isempty(validEntries)
         T = table();
     else
-        T = struct2table(structArray, 'AsArray', true);
+        % Convert cell of structs to a struct array for struct2table
+        T = struct2table([validEntries{:}], 'AsArray', true);
     end
 end
