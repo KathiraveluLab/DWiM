@@ -1,11 +1,9 @@
 function [info, status] = readDicomSafe(filePath)
-    % READDICOMSAFE Safely reads DICOM metadata with error handling.
-    
     arguments
         filePath (1,1) string
     end
 
-    % FIX: Machine-agnostic absolute path check using java.io.File
+    % Use java.io.File for robust path detection
     if ~java.io.File(char(filePath)).isAbsolute()
         filePath = fullfile(pwd, filePath);
     end
@@ -15,10 +13,15 @@ function [info, status] = readDicomSafe(filePath)
 
     try
         if ~exist(filePath, 'file')
-            error('File not found: %s', filePath);
+            error('DWiM:FileNotFound', 'File not found: %s', filePath);
         end
-        % FIX: Removed unnecessary char() conversion for modern MATLAB
-        info = dicominfo(filePath);
+        
+        % Check for toolbox presence to avoid Undefined Function errors
+        if isempty(which('dicominfo'))
+            error('DWiM:ToolboxMissing', 'Image Processing Toolbox (dicominfo) is not installed.');
+        end
+        
+        info = dicominfo(char(filePath)); % Explicit char for older versions
     catch ME
         status.success = false;
         status.message = string(ME.message);
