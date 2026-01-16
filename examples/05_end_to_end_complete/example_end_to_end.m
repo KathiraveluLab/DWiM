@@ -202,99 +202,60 @@ catch ME
 end
 
 %% LAYER 5: ML PREPARATION - Organize Dataset for Training
-% Structure processed data for ML frameworks (PyTorch, TensorFlow)
+% Structure processed data for ML frameworks using DatasetBuilder
 
 fprintf('\n');
 fprintf('========================================\n');
 fprintf('LAYER 5: ML DATASET PREPARATION\n');
 fprintf('========================================\n\n');
 
-% Create ML dataset directory structure
+% Create ML dataset using DatasetBuilder
 mlDatasetRoot = fullfile(tempDir, 'ml_dataset');
-trainDir = fullfile(mlDatasetRoot, 'train');
-valDir = fullfile(mlDatasetRoot, 'val');
-testDir = fullfile(mlDatasetRoot, 'test');
 
-% Create directories
-dirs = {trainDir, valDir, testDir};
-for i = 1:length(dirs)
-    if ~exist(dirs{i}, 'dir')
-        mkdir(dirs{i});
-    end
+% Initialize dataset builder
+builder = dwim.ml.DatasetBuilder(mlDatasetRoot);
+builder.setSplitRatios([0.70, 0.15, 0.15]);
+builder.setTargetSize([128, 128, 64]);
+builder.setNormalization('minmax');
+builder.setFormat('mat');
+builder.setBatchSize(4);
+
+fprintf('Dataset Builder Configuration:\n');
+fprintf('  Output: %s\n', mlDatasetRoot);
+fprintf('  Split Ratios: Train=%.0f%%, Val=%.0f%%, Test=%.0f%%\n', ...
+    builder.SplitRatios(1)*100, builder.SplitRatios(2)*100, builder.SplitRatios(3)*100);
+fprintf('  Target Size: [%d, %d, %d]\n', builder.TargetSize);
+fprintf('  Normalization: %s\n', builder.Normalization);
+fprintf('  Format: %s\n', upper(builder.Format));
+
+% Add the processed volume
+sampleMetadata = struct(...
+    'patientID', metadata.PatientID, ...
+    'studyDate', metadata.StudyDate, ...
+    'modality', metadata.Modality, ...
+    'label', 0 ...  % Example label
+);
+builder.addVolumes({volume}, {sampleMetadata});
+
+% Build the dataset
+fprintf('\nBuilding ML dataset...\n');
+builder.build();
+
+fprintf('\nDataset created successfully!\n');
+fprintf('  Total volumes: %d\n', builder.NumVolumes);
+fprintf('  Train samples: %d\n', length(builder.TrainIndices));
+fprintf('  Validation samples: %d\n', length(builder.ValIndices));
+fprintf('  Test samples: %d\n', length(builder.TestIndices));
+
+% Validate dataset integrity
+fprintf('\nValidating dataset integrity...\n');
+[isValid, report] = builder.validateIntegrity();
+if isValid
+    fprintf('Dataset validation: PASSED\n');
+else
+    fprintf('Dataset validation: FAILED\n');
+    fprintf('%s\n', report);
 end
-
-fprintf('Created ML dataset directory structure:\n');
-fprintf('  Root: %s\n', mlDatasetRoot);
-fprintf('  Train: %s\n', trainDir);
-fprintf('  Val: %s\n', valDir);
-fprintf('  Test: %s\n', testDir);
-
-% Split data (70% train, 15% val, 15% test)
-% For this example, we'll use the single volume we processed
-splitRatios = [0.70, 0.15, 0.15];
-fprintf('\nDataset split ratios: Train=%.0f%%, Val=%.0f%%, Test=%.0f%%\n', ...
-    splitRatios(1)*100, splitRatios(2)*100, splitRatios(3)*100);
-
-% Save volume to training set (as example)
-volumeFilename = sprintf('volume_%s.mat', datestr(now, 'yyyymmdd_HHMMSS'));
-volumePath = fullfile(trainDir, volumeFilename);
-save(volumePath, 'volume', 'metadata');
-fprintf('\nSaved volume to: %s\n', volumePath);
-
-% Create dataset manifest (JSON format for ML frameworks)
-manifest = struct(...
-    'dataset', struct(...
-        'name', 'DWiM_CT_Example', ...
-        'version', '1.0', ...
-        'created', datestr(now, 'yyyy-mm-dd HH:MM:SS'), ...
-        'modality', 'CT', ...
-        'task', 'segmentation'), ...
-    'splits', struct(...
-        'train', struct('samples', 1, 'path', 'train'), ...
-        'val', struct('samples', 0, 'path', 'val'), ...
-        'test', struct('samples', 0, 'path', 'test')), ...
-    'preprocessing', struct(...
-        'window', config2D.window, ...
-        'normalization', config2D.normalization, ...
-        'spacing', config3D.targetSpacing, ...
-        'orientation', config3D.targetOrientation), ...
-    'volume_info', struct(...
-        'dimensions', size(volume), ...
-        'spacing', [metadata.PixelSpacing; metadata.SliceThickness], ...
-        'datatype', class(volume)));
-
-% Save manifest
-manifestPath = fullfile(mlDatasetRoot, 'dataset_manifest.json');
-manifestJSON = jsonencode(manifest, 'PrettyPrint', true);
-fid = fopen(manifestPath, 'w');
-fprintf(fid, '%s', manifestJSON);
-fclose(fid);
-fprintf('Saved dataset manifest to: %s\n', manifestPath);
-
-% Create README for the dataset
-readmePath = fullfile(mlDatasetRoot, 'README.txt');
-fid = fopen(readmePath, 'w');
-fprintf(fid, 'DWiM ML Dataset\n');
-fprintf(fid, '===============\n\n');
-fprintf(fid, 'Created: %s\n', datestr(now));
-fprintf(fid, 'Source: DWiM End-to-End Pipeline\n\n');
-fprintf(fid, 'Directory Structure:\n');
-fprintf(fid, '  train/ - Training set (70%%)\n');
-fprintf(fid, '  val/   - Validation set (15%%)\n');
-fprintf(fid, '  test/  - Test set (15%%)\n\n');
-fprintf(fid, 'Data Format:\n');
-fprintf(fid, '  - MATLAB .mat files\n');
-fprintf(fid, '  - Variables: volume, metadata\n');
-fprintf(fid, '  - Spacing: [%.2f, %.2f, %.2f] mm\n', config3D.targetSpacing);
-fprintf(fid, '  - Orientation: %s\n', config3D.targetOrientation);
-fprintf(fid, '  - Normalization: %s\n\n', config2D.normalization.method);
-fprintf(fid, 'Preprocessing:\n');
-fprintf(fid, '  - Window: %s (C=%d, W=%d)\n', ...
-    config2D.window.preset, config2D.window.center, config2D.window.width);
-fprintf(fid, '  - HU normalization: [%.1f, %.1f]\n', ...
-    config2D.normalization.outputRange(1), config2D.normalization.outputRange(2));
-fclose(fid);
-fprintf('Created dataset README\n');
 
 %% SUMMARY: Complete Workflow Metrics
 % Display comprehensive metrics from all pipeline stages
@@ -332,9 +293,12 @@ fprintf('\n');
 
 fprintf('Layer 5 (ML Preparation):\n');
 fprintf('  Dataset root: %s\n', mlDatasetRoot);
-fprintf('  Volumes exported: 1\n');
-fprintf('  Format: MATLAB .mat\n');
-fprintf('  Manifest: dataset_manifest.json\n');
+fprintf('  Builder: dwim.ml.DatasetBuilder\n');
+fprintf('  Total volumes: %d\n', builder.NumVolumes);
+fprintf('  Train/Val/Test: %d/%d/%d\n', length(builder.TrainIndices), ...
+    length(builder.ValIndices), length(builder.TestIndices));
+fprintf('  Format: %s\n', upper(builder.Format));
+fprintf('  Validation: %s\n', ternary(isValid, 'PASSED', 'FAILED'));
 fprintf('  Ready for: PyTorch, TensorFlow, MATLAB Deep Learning\n');
 fprintf('\n');
 
@@ -344,7 +308,7 @@ fprintf('========================================\n');
 fprintf('\nAll 5 layers demonstrated successfully.\n');
 fprintf('Dataset ready at: %s\n', mlDatasetRoot);
 fprintf('\nNext steps:\n');
-fprintf('  1. Review dataset manifest: %s\n', manifestPath);
+fprintf('  1. Review dataset manifest in output directory\n');
 fprintf('  2. Load volumes in your ML framework\n');
 fprintf('  3. Train your model\n');
 fprintf('  4. Process additional studies using the pipeline\n\n');

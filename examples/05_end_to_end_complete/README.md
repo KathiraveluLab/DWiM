@@ -109,24 +109,27 @@ config.verbose = true;
 
 ---
 
-### Layer 5: ML Preparation (Future)
+### Layer 5: ML Preparation
 **Purpose:** Convert volumes to ML-ready datasets
 
-**Planned Responsibilities:**
+**Status:** Implemented (`dwim.ml.DatasetBuilder`)
+
+**Responsibilities:**
 
 1. **Batch Organization**
-   - Organize volumes into train/validation/test sets
-   - Create standardized directory structure
-   - Generate manifests
+   - Automatic train/validation/test splitting with configurable ratios
+   - Standardized directory structure creation
+   - JSON metadata manifests
 
 2. **Volume Resizing**
-   - Resize to fixed ML input dimensions
-   - Options: center crop, padding, interpolation
-   - Preserve spatial information
+   - Resize to fixed ML input dimensions using imresize3
+   - Linear interpolation for smooth resampling
+   - Maintains volume integrity
 
 3. **Intensity Normalization**
-   - Standardize intensity distributions
-   - Z-score or per-volume normalization
+   - Four normalization methods: minmax, zscore, HU-windowing, percentile
+   - Per-volume normalization (current implementation)
+   - Dataset-level normalization (planned enhancement for better model performance)
    - Handle outliers
 
 4. **Metadata Linkage**

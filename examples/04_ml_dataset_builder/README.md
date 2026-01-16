@@ -98,6 +98,9 @@ dataset/
 import scipy.io
 import torch
 
+import scipy.io
+from torch.utils.data import TensorDataset, DataLoader
+
 # Load batch
 data = scipy.io.loadmat('dataset/train/batch_001.mat')
 volumes = torch.from_numpy(data['volumes'])
@@ -132,8 +135,10 @@ batch = load('dataset/train/batch_001.mat');
 volumes = batch.volumes;
 labels = categorical(batch.labels);
 
-% Create datastore
-ds = arrayDatastore(volumes);
+% Create datastores for volumes and labels
+volDS = arrayDatastore(volumes, 'IterationDimension', 4);
+lblDS = arrayDatastore(labels);
+ds = combine(volDS, lblDS);
 ```
 
 ## Validation

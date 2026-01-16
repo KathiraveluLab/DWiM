@@ -287,6 +287,35 @@ fprintf('DWiM path: %s\n', dwimPath);
 % 6. Use 0.5-1.0mm spacing for ML (avoid extreme high resolution)
 % 7. Parallelize batch processing with parfor if available
 
+%% EXAMPLE 11: Create ML Dataset
+% Use DatasetBuilder to prepare train/val/test splits for ML frameworks
+
+% Initialize builder
+builder = dwim.ml.DatasetBuilder('output/ml_dataset');
+builder.setSplitRatios([0.7, 0.15, 0.15]);  % 70% train, 15% val, 15% test
+builder.setTargetSize([128, 128, 64]);       % Resize to fixed dimensions
+builder.setNormalization('minmax');          % Normalize to [0, 1]
+builder.setFormat('mat');                    % Output format (mat/nifti/hdf5)
+builder.setBatchSize(8);                     % Volumes per batch file
+
+% Add volumes with metadata
+volumes = {volume1, volume2, volume3};
+metadata = {
+    struct('patientID', 'P001', 'label', 0);
+    struct('patientID', 'P002', 'label', 1);
+    struct('patientID', 'P003', 'label', 0);
+};
+builder.addVolumes(volumes, metadata);
+
+% Build and validate
+builder.build();
+[isValid, report] = builder.validateIntegrity();
+if isValid
+    fprintf('Dataset ready: %d train, %d val, %d test\n', ...
+        length(builder.TrainIndices), length(builder.ValIndices), ...
+        length(builder.TestIndices));
+end
+
 %% ========================================================================
 %% HELPFUL LINKS
 %% ========================================================================

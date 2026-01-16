@@ -260,8 +260,8 @@ classdef DatasetBuilder < handle
                             case 'nifti'
                                 actualSamples = actualSamples + 1;
                             case 'hdf5'
-                                info = h5info(filePath);
-                                actualSamples = actualSamples + 1;
+                                info = h5info(filePath, '/volumes');
+                                actualSamples = actualSamples + info.Dataspace.Size(4);
                         end
                     catch ME
                         report = [report, sprintf('ERROR: Failed to read %s: %s\n', ...
@@ -310,8 +310,8 @@ classdef DatasetBuilder < handle
             indices = randperm(obj.NumVolumes);
             
             % Calculate split sizes
-            numTrain = round(obj.NumVolumes * obj.SplitRatios(1));
-            numVal = round(obj.NumVolumes * obj.SplitRatios(2));
+            numTrain = floor(obj.NumVolumes * obj.SplitRatios(1));
+            numVal = floor(obj.NumVolumes * obj.SplitRatios(2));
             
             % Assign indices
             obj.TrainIndices = indices(1:numTrain);
