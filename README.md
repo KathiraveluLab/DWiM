@@ -40,6 +40,8 @@ See the `examples/` directory for detailed usage examples:
 - `02_ml_preprocessing/`: 2D image preprocessing for ML
 - `03_volume_pipeline/`: Complete 3D volume processing pipeline
 - `04_unified_pipeline/`: Unified preprocessing for ML workflows
+- `05_end_to_end_complete/`: **Complete architecture demonstration** (all 5 layers)
+- `QUICK_START_GUIDE.m`: Quick reference for common workflows
 
 ## Installation
 Clone the repository and add to MATLAB path:
