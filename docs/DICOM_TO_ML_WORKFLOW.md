@@ -232,11 +232,11 @@ import scipy.io
 
 # Load training batch
 batch = scipy.io.loadmat('ml_dataset/train/batch_001.mat')
-volumes = torch.FloatTensor(batch['volumes'])  # Shape: [N, H, W, D]
+# batch['volumes'] from MATLAB is typically shaped [H, W, D, N].
+volumes_np = np.transpose(batch['volumes'], (3, 0, 1, 2))  # Shape: [N, H, W, D]
+# Convert to PyTorch's expected [N, C, H, W, D].
+volumes = torch.from_numpy(volumes_np).float().unsqueeze(1)  # Shape: [N, 1, H, W, D]
 labels = torch.LongTensor(batch['labels'].flatten())
-
-# Permute to PyTorch format [N, C, H, W, D]
-volumes = volumes.permute(0, 4, 1, 2, 3)  # Add channel dimension if needed
 
 # Create dataset and dataloader
 dataset = TensorDataset(volumes, labels)
@@ -258,12 +258,13 @@ import numpy as np
 
 # Load training batch
 batch = scipy.io.loadmat('ml_dataset/train/batch_001.mat')
-volumes = batch['volumes']  # Shape: [N, H, W, D]
+# batch['volumes'] from MATLAB is typically shaped [H, W, D, N]. Transpose to [N, H, W, D].
+volumes = np.transpose(batch['volumes'], (3, 0, 1, 2))
 labels = batch['labels'].flatten()
 
-# Create tf.data.Dataset
+# Create tf.data.Dataset, add channel dim, shuffle, batch, and prefetch.
 dataset = tf.data.Dataset.from_tensor_slices((volumes, labels))
-dataset = dataset.shuffle(buffer_size=100).batch(4).prefetch(tf.data.AUTOTUNE)
+dataset = dataset.map(lambda vol, label: (tf.expand_dims(vol, axis=-1), label)).shuffle(buffer_size=100).batch(4).prefetch(tf.data.AUTOTUNE)
 
 # Training loop
 for batch_volumes, batch_labels in dataset:
@@ -277,11 +278,14 @@ for batch_volumes, batch_labels in dataset:
 ```matlab
 % Load training batch
 batch = load('ml_dataset/train/batch_001.mat');
-volumes = batch.volumes;
+volumes = batch.volumes;  % Shape is [H, W, D, N]
 labels = categorical(batch.labels);
 
-% Create datastores
-volDS = arrayDatastore(volumes, 'IterationDimension', 4);
+% Reshape to include channel dimension: [H, W, D, C, N]
+volumes = reshape(volumes, [size(volumes,1), size(volumes,2), size(volumes,3), 1, size(volumes,4)]);
+
+% Create datastores, iterating over the 5th dimension (samples)
+volDS = arrayDatastore(volumes, 'IterationDimension', 5);
 lblDS = arrayDatastore(labels);
 ds = combine(volDS, lblDS);
 
@@ -370,7 +374,11 @@ fprintf('  Output: %s\n', outputDir);
 fprintf('  Train: %d volumes\n', length(builder.TrainIndices));
 fprintf('  Val: %d volumes\n', length(builder.ValIndices));
 fprintf('  Test: %d volumes\n', length(builder.TestIndices));
-fprintf('  Validation: %s\n', ternary(isValid, 'PASSED', 'FAILED'));
+if isValid
+    fprintf('  Validation: PASSED\n');
+else
+    fprintf('  Validation: FAILED\n');
+end
 
 %% Step 5: Ready for ML Training
 fprintf('\nDataset ready for ML frameworks:\n');
