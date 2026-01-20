@@ -271,7 +271,7 @@ dataset = dataset.map(lambda vol, label: (tf.expand_dims(vol, axis=-1), label)).
 
 # Training loop
 for batch_volumes, batch_labels in dataset:
-    # batch_volumes shape: [batch_size, height, width, depth]
+    # batch_volumes shape: [batch_size, depth, height, width, 1]
     # batch_labels shape: [batch_size]
     pass
 ```
