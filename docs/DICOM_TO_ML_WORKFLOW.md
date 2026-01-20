@@ -247,7 +247,7 @@ train_loader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=2)
 
 # Training loop
 for batch_idx, (data, target) in enumerate(train_loader):
-    # data shape: [batch_size, channels, height, width, depth]
+    # data shape: [batch_size, channels, depth, height, width]
     # target shape: [batch_size]
     pass
 ```
