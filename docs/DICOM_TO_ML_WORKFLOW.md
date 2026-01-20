@@ -233,9 +233,9 @@ import scipy.io
 # Load training batch
 batch = scipy.io.loadmat('ml_dataset/train/batch_001.mat')
 # batch['volumes'] from MATLAB is typically shaped [H, W, D, N].
-volumes_np = np.transpose(batch['volumes'], (3, 0, 1, 2))  # Shape: [N, H, W, D]
-# Convert to PyTorch's expected [N, C, H, W, D].
-volumes = torch.from_numpy(volumes_np).float().unsqueeze(1)  # Shape: [N, 1, H, W, D]
+volumes_np = np.transpose(batch['volumes'], (3, 2, 0, 1))  # Shape: [N, D, H, W]
+# Convert to PyTorch's expected [N, C, D, H, W].
+volumes = torch.from_numpy(volumes_np).float().unsqueeze(1)  # Shape: [N, 1, D, H, W]
 labels = torch.LongTensor(batch['labels'].flatten())
 
 # Create dataset and dataloader
