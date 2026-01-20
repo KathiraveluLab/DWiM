@@ -329,7 +329,7 @@ dicomDir = 'data/ct_scans/series_001/';
 outputDir = 'output/ml_ready/';
 
 %% Step 2: Configure Unified Pipeline
-config = dwim.preprocessPipeline_config();
+config = struct();
 config.inputType = 'dicomdir';
 config.steps = {'assemble', 'orient', 'resample'};
 config.targetOrientation = 'RAS';
