@@ -12,6 +12,9 @@ This guide demonstrates the complete workflow from DICOM acquisition through ML-
 7. [Step 5: ML Framework Integration](#step-5-ml-framework-integration)
 8. [Complete Example](#complete-example)
 9. [Best Practices](#best-practices)
+10. [Troubleshooting](#troubleshooting)
+11. [Next Steps](#next-steps)
+12. [Additional Resources](#additional-resources)
 
 ## Overview
 
