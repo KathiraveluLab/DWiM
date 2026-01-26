@@ -41,7 +41,7 @@ classdef DatasetValidator < handle
                 obj.Manifest = jsondecode(fileread(obj.ManifestPath));
                 obj.Format = obj.Manifest.format;
             else
-                warning('Manifest file not found: %s', obj.ManifestPath);
+                error('DatasetValidator:ManifestNotFound', 'Manifest file not found: %s', obj.ManifestPath);
             end
         end
         
@@ -88,7 +88,18 @@ classdef DatasetValidator < handle
             result.missingFiles = {};
             result.corruptedFiles = {};
             
-            splits = {'train', 'val', 'test'};
+            % Dynamically discover splits from subdirectories
+            dirContents = dir(obj.DatasetPath);
+            isSubdir = [dirContents.isdir];
+            % Exclude '.' and '..' and files
+            validDirs = isSubdir & ~ismember({dirContents.name}, {'.', '..'});
+            splits = {dirContents(validDirs).name};
+            
+            if isempty(splits)
+                warning('No dataset splits found in %s', obj.DatasetPath);
+                return;
+            end
+            
             for s = 1:length(splits)
                 splitName = splits{s};
                 splitDir = fullfile(obj.DatasetPath, splitName);
@@ -108,7 +119,7 @@ classdef DatasetValidator < handle
                         % Try to load a small portion to verify readability
                         switch obj.Format
                             case 'mat'
-                                load(filePath, '-mat');
+                                whos('-file', filePath);
                             case 'nifti'
                                 niftiinfo(filePath);
                             case 'hdf5'
@@ -230,8 +241,8 @@ classdef DatasetValidator < handle
                                 batchLabels = h5read(filePath, '/labels');
                                 labels = [labels; batchLabels(:)];
                         end
-                    catch
-                        % Skip files without labels
+                    catch ME
+                        warning('DatasetValidator:SkippingFile', 'Skipping file %s due to error: %s', filePath, ME.message);
                     end
                 end
                 
@@ -305,8 +316,8 @@ classdef DatasetValidator < handle
                         nanCount = nanCount + sum(isnan(volumes(:)));
                         infCount = infCount + sum(isinf(volumes(:)));
                         
-                    catch
-                        % Skip problematic files
+                    catch ME
+                        warning('DatasetValidator:SkippingFile', 'Skipping file %s due to error: %s', filePath, ME.message);
                     end
                 end
                 
@@ -380,8 +391,8 @@ classdef DatasetValidator < handle
                                     splitName, minVal, maxVal, expectedRange(1), expectedRange(2));
                             end
                         end
-                    catch
-                        % Skip
+                    catch ME
+                        warning('DatasetValidator:SkippingFile', 'Skipping file %s due to error: %s', filePath, ME.message);
                     end
                 end
             end
@@ -395,7 +406,7 @@ classdef DatasetValidator < handle
             fprintf('Estimating memory footprint...\n');
             result = struct();
             result.totalSize_GB = 0;
-            result.splitSizes_GB = struct();
+            result.splitSizes_GB = struct('train', 0, 'val', 0, 'test', 0);
             
             splits = {'train', 'val', 'test'};
             
@@ -465,8 +476,8 @@ classdef DatasetValidator < handle
                                     end
                                 end
                         end
-                    catch
-                        % Skip
+                    catch ME
+                        warning('DatasetValidator:SkippingFile', 'Skipping file %s due to error: %s', filePath, ME.message);
                     end
                 end
             end

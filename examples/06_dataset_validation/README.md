@@ -190,7 +190,16 @@ duplicates: {}
 validator = dwim.ml.DatasetValidator('dataset_path');
 report = validator.runAllChecks();
 
-if all(structfun(@(x) x.passed, report))
+allPassed = true;
+checkFields = fieldnames(report);
+for i = 1:length(checkFields)
+    checkResult = report.(checkFields{i});
+    if isstruct(checkResult) && isfield(checkResult, 'passed') && ~checkResult.passed
+        allPassed = false;
+        break;
+    end
+end
+if allPassed
     fprintf('Dataset validated - starting training...\n');
     % Start training
 else
