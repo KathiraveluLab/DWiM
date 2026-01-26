@@ -44,7 +44,9 @@ run('example_dataset_validation.m')
 ### 5. Normalization Verification
 - Values within expected range
 - Consistent normalization across splits
-- Method-specific checks (minmax, zscore, etc.)
+- Method-specific checks:
+  - **minmax**: Verifies values fall within specified range
+  - **zscore**: Checks mean ≈ 0 and std ≈ 1
 
 ### 6. Memory Footprint
 - Disk space usage per split

@@ -26,6 +26,23 @@ classdef DatasetValidator < handle
     end
     
     methods
+        function splits = getDatasetSplits(obj)
+            % Get dataset splits dynamically from directory structure
+            %
+            % OUTPUTS:
+            %   splits - Cell array of split names (e.g., {'train', 'val', 'test'})
+            
+            dirContents = dir(obj.DatasetPath);
+            isSubdir = [dirContents.isdir];
+            % Exclude '.' and '..' and files
+            validDirs = isSubdir & ~ismember({dirContents.name}, {'.', '..'});
+            splits = {dirContents(validDirs).name};
+            
+            if isempty(splits)
+                warning('No dataset splits found in %s', obj.DatasetPath);
+            end
+        end
+        
         function obj = DatasetValidator(datasetPath)
             % Constructor
             %
@@ -144,7 +161,7 @@ classdef DatasetValidator < handle
             result.shapes = struct();
             result.inconsistencies = {};
             
-            splits = {'train', 'val', 'test'};
+            splits = obj.getDatasetSplits();
             expectedShape = [];
             
             for s = 1:length(splits)
@@ -165,17 +182,22 @@ classdef DatasetValidator < handle
                             case 'mat'
                                 data = load(filePath);
                                 if isfield(data, 'volumes')
-                                    volShape = size(data.volumes);
-                                    volShape = volShape(1:3);  % [H, W, D]
+                                    s = size(data.volumes);
+                                    s(end+1:3) = 1; % Pad with 1s if fewer than 3 dims
+                                    volShape = s(1:3);  % [H, W, D]
                                 else
                                     continue;
                                 end
                             case 'nifti'
                                 info = niftiinfo(filePath);
-                                volShape = info.ImageSize(1:3);
+                                s = info.ImageSize;
+                                s(end+1:3) = 1; % Pad with 1s if fewer than 3 dims
+                                volShape = s(1:3);
                             case 'hdf5'
                                 info = h5info(filePath, '/volumes');
-                                volShape = info.Dataspace.Size(1:3);
+                                s = info.Dataspace.Size;
+                                s(end+1:3) = 1; % Pad with 1s if fewer than 3 dims
+                                volShape = s(1:3);
                         end
                         
                         % Check consistency
@@ -214,7 +236,7 @@ classdef DatasetValidator < handle
             result.distribution = struct();
             result.warnings = {};
             
-            splits = {'train', 'val', 'test'};
+            splits = obj.getDatasetSplits();
             
             for s = 1:length(splits)
                 splitName = splits{s};
@@ -224,8 +246,8 @@ classdef DatasetValidator < handle
                     continue;
                 end
                 
-                labels = [];
                 files = dir(fullfile(splitDir, ['*.' obj.Format]));
+                labelCells = cell(length(files), 1);
                 
                 for f = 1:length(files)
                     filePath = fullfile(splitDir, files(f).name);
@@ -235,16 +257,19 @@ classdef DatasetValidator < handle
                             case 'mat'
                                 data = load(filePath);
                                 if isfield(data, 'labels')
-                                    labels = [labels; data.labels(:)];
+                                    labelCells{f} = data.labels(:);
                                 end
                             case 'hdf5'
                                 batchLabels = h5read(filePath, '/labels');
-                                labels = [labels; batchLabels(:)];
+                                labelCells{f} = batchLabels(:);
                         end
                     catch ME
                         warning('DatasetValidator:SkippingFile', 'Skipping file %s due to error: %s', filePath, ME.message);
                     end
                 end
+                
+                % Concatenate all labels at once
+                labels = vertcat(labelCells{:});
                 
                 % Compute distribution
                 if ~isempty(labels)
@@ -279,7 +304,7 @@ classdef DatasetValidator < handle
             result.issues = {};
             result.statistics = struct();
             
-            splits = {'train', 'val', 'test'};
+            splits = obj.getDatasetSplits();
             
             for s = 1:length(splits)
                 splitName = splits{s};
@@ -349,7 +374,7 @@ classdef DatasetValidator < handle
             result.ranges = struct();
             result.warnings = {};
             
-            splits = {'train', 'val', 'test'};
+            splits = obj.getDatasetSplits();
             
             for s = 1:length(splits)
                 splitName = splits{s};
@@ -379,6 +404,8 @@ classdef DatasetValidator < handle
                         
                         minVal = min(volumes(:));
                         maxVal = max(volumes(:));
+                        meanVal = mean(volumes(:));
+                        stdVal = std(volumes(:));
                         
                         result.ranges.(splitName) = [minVal, maxVal];
                         
@@ -389,6 +416,13 @@ classdef DatasetValidator < handle
                                 result.warnings{end+1} = sprintf(...
                                     '%s: Values [%.3f, %.3f] outside expected range [%.3f, %.3f]', ...
                                     splitName, minVal, maxVal, expectedRange(1), expectedRange(2));
+                            end
+                        elseif obj.Manifest.normalization.method == "zscore"
+                            % For z-score normalization, check if mean is close to 0 and std is close to 1
+                            if abs(meanVal) > 0.1 || abs(stdVal - 1.0) > 0.1
+                                result.warnings{end+1} = sprintf(...
+                                    '%s: Z-score stats [mean=%.3f, std=%.3f] deviate from expected [mean=0, std=1]', ...
+                                    splitName, meanVal, stdVal);
                             end
                         end
                     catch ME
@@ -406,9 +440,14 @@ classdef DatasetValidator < handle
             fprintf('Estimating memory footprint...\n');
             result = struct();
             result.totalSize_GB = 0;
-            result.splitSizes_GB = struct('train', 0, 'val', 0, 'test', 0);
+            result.splitSizes_GB = struct();
             
-            splits = {'train', 'val', 'test'};
+            splits = obj.getDatasetSplits();
+            
+            % Initialize split sizes
+            for s = 1:length(splits)
+                result.splitSizes_GB.(splits{s}) = 0;
+            end
             
             for s = 1:length(splits)
                 splitName = splits{s};
@@ -447,8 +486,9 @@ classdef DatasetValidator < handle
             result.duplicates = {};
             
             % Extract patient IDs from metadata if available
-            splits = {'train', 'val', 'test'};
+            splits = obj.getDatasetSplits();
             patientIDs = struct();
+            formatSupported = false;
             
             for s = 1:length(splits)
                 splitName = splits{s};
@@ -467,6 +507,7 @@ classdef DatasetValidator < handle
                     try
                         switch obj.Format
                             case 'mat'
+                                formatSupported = true;
                                 data = load(filePath);
                                 if isfield(data, 'metadata')
                                     for i = 1:length(data.metadata)
@@ -475,11 +516,33 @@ classdef DatasetValidator < handle
                                         end
                                     end
                                 end
+                            case 'hdf5'
+                                formatSupported = true;
+                                % Try to read patient IDs from HDF5 metadata
+                                try
+                                    patientData = h5read(filePath, '/metadata/patientID');
+                                    if iscell(patientData)
+                                        patientIDs.(splitName) = [patientIDs.(splitName), patientData{:}];
+                                    else
+                                        patientIDs.(splitName){end+1} = patientData;
+                                    end
+                                catch
+                                    % Patient ID not found in this file
+                                end
+                            otherwise
+                                % Format not supported for contamination check
                         end
                     catch ME
                         warning('DatasetValidator:SkippingFile', 'Skipping file %s due to error: %s', filePath, ME.message);
                     end
                 end
+            end
+            
+            % Warn if format doesn't support contamination checking
+            if ~formatSupported
+                result.warnings = sprintf('Contamination check not supported for format: %s. Only MAT and HDF5 formats are supported.', obj.Format);
+                fprintf('  WARNING: %s\n', result.warnings);
+                return;
             end
             
             % Check for overlaps
