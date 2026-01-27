@@ -143,9 +143,9 @@ if ~isempty(normResult.warnings)
 end
 fprintf('\n');
 
-% Memory footprint
-fprintf('=== Estimating Memory Footprint ===\n');
-memResult = validator.estimateMemoryFootprint();
+% Disk usage estimation
+fprintf('=== Estimating Disk Usage ===\n');
+memResult = validator.estimateDiskUsage();
 % Results printed by method
 
 % Cross-split contamination

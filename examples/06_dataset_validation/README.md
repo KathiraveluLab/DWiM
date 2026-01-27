@@ -84,8 +84,8 @@ qualityResult = validator.checkDataQuality();
 % Normalization
 normResult = validator.verifyNormalization();
 
-% Memory footprint
-memResult = validator.estimateMemoryFootprint();
+% Disk usage
+memResult = validator.estimateDiskUsage();
 
 % Contamination check
 contaminationResult = validator.checkCrossSplitContamination();
@@ -149,7 +149,7 @@ ranges:
   train: [0.000 1.000]
   val: [0.001 0.999]
 
---- MEMORY FOOTPRINT ---
+--- DISK USAGE ---
 totalSize_GB: 2.45
 splitSizes_GB:
   train: 1.72
@@ -234,7 +234,7 @@ validator = dwim.ml.DatasetValidator(datasetPath)
 - `analyzeLabelDistribution()` - Analyze class balance
 - `checkDataQuality()` - Check for NaN/Inf/outliers
 - `verifyNormalization()` - Verify normalization consistency
-- `estimateMemoryFootprint()` - Estimate memory requirements
+- `estimateDiskUsage()` - Estimate disk space occupied by dataset
 - `checkCrossSplitContamination()` - Detect data leakage
 - `generateReport(path)` - Generate detailed validation report
 

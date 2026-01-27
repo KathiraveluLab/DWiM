@@ -85,8 +85,8 @@ classdef DatasetValidator < handle
             % Normalization verification
             obj.ValidationResults.normalization = obj.verifyNormalization();
             
-            % Memory footprint estimation
-            obj.ValidationResults.memoryFootprint = obj.estimateMemoryFootprint();
+            % Disk usage estimation
+            obj.ValidationResults.diskUsage = obj.estimateDiskUsage();
             
             % Cross-split contamination check
             obj.ValidationResults.contamination = obj.checkCrossSplitContamination();
@@ -105,15 +105,8 @@ classdef DatasetValidator < handle
             result.missingFiles = {};
             result.corruptedFiles = {};
             
-            % Dynamically discover splits from subdirectories
-            dirContents = dir(obj.DatasetPath);
-            isSubdir = [dirContents.isdir];
-            % Exclude '.' and '..' and files
-            validDirs = isSubdir & ~ismember({dirContents.name}, {'.', '..'});
-            splits = {dirContents(validDirs).name};
-            
+            splits = obj.getDatasetSplits();
             if isempty(splits)
-                warning('No dataset splits found in %s', obj.DatasetPath);
                 return;
             end
             
@@ -164,8 +157,8 @@ classdef DatasetValidator < handle
             splits = obj.getDatasetSplits();
             expectedShape = [];
             
-            for s = 1:length(splits)
-                splitName = splits{s};
+            for splitIdx = 1:length(splits)
+                splitName = splits{splitIdx};
                 splitDir = fullfile(obj.DatasetPath, splitName);
                 
                 if ~exist(splitDir, 'dir')
@@ -180,11 +173,13 @@ classdef DatasetValidator < handle
                     try
                         switch obj.Format
                             case 'mat'
-                                data = load(filePath);
-                                if isfield(data, 'volumes')
-                                    s = size(data.volumes);
-                                    s(end+1:3) = 1; % Pad with 1s if fewer than 3 dims
-                                    volShape = s(1:3);  % [H, W, D]
+                                % Use whos to avoid loading entire file
+                                fileVars = whos('-file', filePath);
+                                volumesIdx = find(strcmp({fileVars.name}, 'volumes'), 1);
+                                if ~isempty(volumesIdx)
+                                    volSize = fileVars(volumesIdx).size;
+                                    volSize(end+1:3) = 1; % Pad with 1s if fewer than 3 dims
+                                    volShape = volSize(1:3);  % [H, W, D]
                                 else
                                     continue;
                                 end
@@ -237,6 +232,13 @@ classdef DatasetValidator < handle
             result.warnings = {};
             
             splits = obj.getDatasetSplits();
+            
+            % Check if format is supported
+            if ~ismember(obj.Format, {'mat', 'hdf5'})
+                result.warnings{end+1} = sprintf('Label distribution check not supported for format: %s. Only MAT and HDF5 formats are supported.', obj.Format);
+                fprintf('  WARNING: %s\n', result.warnings{end});
+                return;
+            end
             
             for s = 1:length(splits)
                 splitName = splits{s};
@@ -374,6 +376,13 @@ classdef DatasetValidator < handle
             result.ranges = struct();
             result.warnings = {};
             
+            % Check if format is supported
+            if ~ismember(obj.Format, {'mat', 'hdf5'})
+                result.warnings{end+1} = sprintf('Normalization check not supported for format: %s. Only MAT and HDF5 formats are supported.', obj.Format);
+                fprintf('  WARNING: %s\n', result.warnings{end});
+                return;
+            end
+            
             splits = obj.getDatasetSplits();
             
             for s = 1:length(splits)
@@ -434,10 +443,10 @@ classdef DatasetValidator < handle
             fprintf('  Normalization: %s\n', ternary(isempty(result.warnings), 'PASSED', 'WARNING'));
         end
         
-        function result = estimateMemoryFootprint(obj)
-            % Estimate memory requirements for loading dataset
+        function result = estimateDiskUsage(obj)
+            % Estimate disk space occupied by dataset files
             
-            fprintf('Estimating memory footprint...\n');
+            fprintf('Estimating disk usage...\n');
             result = struct();
             result.totalSize_GB = 0;
             result.splitSizes_GB = struct();
@@ -472,9 +481,11 @@ classdef DatasetValidator < handle
             end
             
             fprintf('  Total size: %.2f GB\n', result.totalSize_GB);
-            fprintf('    Train: %.2f GB\n', result.splitSizes_GB.train);
-            fprintf('    Val: %.2f GB\n', result.splitSizes_GB.val);
-            fprintf('    Test: %.2f GB\n', result.splitSizes_GB.test);
+            splitNames = fieldnames(result.splitSizes_GB);
+            for i = 1:length(splitNames)
+                splitName = splitNames{i};
+                fprintf('    %s: %.2f GB\n', splitName, result.splitSizes_GB.(splitName));
+            end
         end
         
         function result = checkCrossSplitContamination(obj)
@@ -545,28 +556,19 @@ classdef DatasetValidator < handle
                 return;
             end
             
-            % Check for overlaps
-            if isfield(patientIDs, 'train') && isfield(patientIDs, 'val')
-                overlap = intersect(patientIDs.train, patientIDs.val);
-                if ~isempty(overlap)
-                    result.passed = false;
-                    result.duplicates{end+1} = sprintf('Train-Val overlap: %d patients', length(overlap));
-                end
-            end
-            
-            if isfield(patientIDs, 'train') && isfield(patientIDs, 'test')
-                overlap = intersect(patientIDs.train, patientIDs.test);
-                if ~isempty(overlap)
-                    result.passed = false;
-                    result.duplicates{end+1} = sprintf('Train-Test overlap: %d patients', length(overlap));
-                end
-            end
-            
-            if isfield(patientIDs, 'val') && isfield(patientIDs, 'test')
-                overlap = intersect(patientIDs.val, patientIDs.test);
-                if ~isempty(overlap)
-                    result.passed = false;
-                    result.duplicates{end+1} = sprintf('Val-Test overlap: %d patients', length(overlap));
+            % Check for overlaps between all pairs of splits
+            splitNames = fieldnames(patientIDs);
+            for i = 1:length(splitNames)
+                for j = i + 1:length(splitNames)
+                    splitA_name = splitNames{i};
+                    splitB_name = splitNames{j};
+                    
+                    overlap = intersect(patientIDs.(splitA_name), patientIDs.(splitB_name));
+                    if ~isempty(overlap)
+                        result.passed = false;
+                        result.duplicates{end+1} = sprintf('%s-%s overlap: %d patients', ...
+                            splitA_name, splitB_name, length(overlap));
+                    end
                 end
             end
             
