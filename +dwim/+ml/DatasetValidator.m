@@ -264,15 +264,9 @@ classdef DatasetValidator < handle
                     filePath = fullfile(splitDir, files(f).name);
                     
                     try
-                        switch obj.Format
-                            case 'mat'
-                                data = load(filePath);
-                                if isfield(data, 'labels')
-                                    labelCells{f} = data.labels(:);
-                                end
-                            case 'hdf5'
-                                batchLabels = h5read(filePath, '/labels');
-                                labelCells{f} = batchLabels(:);
+                        data = obj.loadDatasetFile(filePath, 'labels');
+                        if ~isempty(data)
+                            labelCells{f} = data(:);
                         end
                     catch ME
                         warning('DatasetValidator:SkippingFile', 'Skipping file %s due to error: %s', filePath, ME.message);
@@ -334,18 +328,9 @@ classdef DatasetValidator < handle
                     filePath = fullfile(splitDir, files(f).name);
                     
                     try
-                        switch obj.Format
-                            case 'mat'
-                                data = load(filePath);
-                                if isfield(data, 'volumes')
-                                    volumes = data.volumes;
-                                else
-                                    continue;
-                                end
-                            case 'nifti'
-                                volumes = niftiread(filePath);
-                            case 'hdf5'
-                                volumes = h5read(filePath, '/volumes');
+                        volumes = obj.loadDatasetFile(filePath, 'volumes');
+                        if isempty(volumes)
+                            continue;
                         end
                         
                         sampleCount = sampleCount + 1;
@@ -408,16 +393,9 @@ classdef DatasetValidator < handle
                     filePath = fullfile(splitDir, files(f).name);
                     
                     try
-                        switch obj.Format
-                            case 'mat'
-                                data = load(filePath);
-                                if isfield(data, 'volumes')
-                                    volumes = data.volumes;
-                                else
-                                    continue;
-                                end
-                            case 'hdf5'
-                                volumes = h5read(filePath, '/volumes');
+                        volumes = obj.loadDatasetFile(filePath, 'volumes');
+                        if isempty(volumes)
+                            continue;
                         end
                         
                         minVal = min(volumes(:));
@@ -457,14 +435,14 @@ classdef DatasetValidator < handle
             
             fprintf('Estimating disk usage...\n');
             result = struct();
-            result.totalSize_GB = 0;
-            result.splitSizes_GB = struct();
+            result.totalSize_GiB = 0;
+            result.splitSizes_GiB = struct();
             
             splits = obj.getDatasetSplits();
             
             % Initialize split sizes
             for s = 1:length(splits)
-                result.splitSizes_GB.(splits{s}) = 0;
+                result.splitSizes_GiB.(splits{s}) = 0;
             end
             
             for s = 1:length(splits)
@@ -484,16 +462,16 @@ classdef DatasetValidator < handle
                     splitSize = splitSize + fileInfo.bytes;
                 end
                 
-                splitSize_GB = splitSize / 1e9;
-                result.splitSizes_GB.(splitName) = splitSize_GB;
-                result.totalSize_GB = result.totalSize_GB + splitSize_GB;
+                splitSize_GiB = splitSize / (1024^3);
+                result.splitSizes_GiB.(splitName) = splitSize_GiB;
+                result.totalSize_GiB = result.totalSize_GiB + splitSize_GiB;
             end
             
-            fprintf('  Total size: %.2f GB\n', result.totalSize_GB);
-            splitNames = fieldnames(result.splitSizes_GB);
+            fprintf('  Total size: %.2f GiB\n', result.totalSize_GiB);
+            splitNames = fieldnames(result.splitSizes_GiB);
             for i = 1:length(splitNames)
                 splitName = splitNames{i};
-                fprintf('    %s: %.2f GB\n', splitName, result.splitSizes_GB.(splitName));
+                fprintf('    %s: %.2f GiB\n', splitName, result.splitSizes_GiB.(splitName));
             end
         end
         
@@ -509,7 +487,13 @@ classdef DatasetValidator < handle
             % Extract patient IDs from metadata if available
             splits = obj.getDatasetSplits();
             patientIDs = struct();
-            formatSupported = false;
+            
+            % Check if format is supported
+            if ~ismember(obj.Format, {'mat', 'hdf5'})
+                result.warnings{end+1} = sprintf('Contamination check not supported for format: %s. Only MAT and HDF5 formats are supported.', obj.Format);
+                fprintf('  WARNING: %s\n', result.warnings{end});
+                return;
+            end
             
             for s = 1:length(splits)
                 splitName = splits{s};
@@ -528,32 +512,30 @@ classdef DatasetValidator < handle
                     try
                         switch obj.Format
                             case 'mat'
-                                formatSupported = true;
-                                data = load(filePath);
-                                if isfield(data, 'metadata')
-                                    if iscell(data.metadata) && ~isempty(data.metadata)
-                                        hasPatientIDFlags = cellfun(@(x) isfield(x, 'patientID'), data.metadata);
+                                metadata = obj.loadDatasetFile(filePath, 'metadata');
+                                if ~isempty(metadata)
+                                    if iscell(metadata) && ~isempty(metadata)
+                                        hasPatientIDFlags = cellfun(@(x) isfield(x, 'patientID'), metadata);
                                         if any(hasPatientIDFlags)
-                                            newIDs = cellfun(@(x) x.patientID, data.metadata(hasPatientIDFlags), 'UniformOutput', false);
+                                            newIDs = cellfun(@(x) x.patientID, metadata(hasPatientIDFlags), 'UniformOutput', false);
                                             patientIDs.(splitName) = [patientIDs.(splitName), newIDs{:}];
                                         end
-                                    elseif isstruct(data.metadata) && isfield(data.metadata, 'patientID')
-                                        newIDs = {data.metadata.patientID};
+                                    elseif isstruct(metadata) && isfield(metadata, 'patientID')
+                                        newIDs = {metadata.patientID};
                                         patientIDs.(splitName) = [patientIDs.(splitName), newIDs{:}];
                                     end
                                 end
                             case 'hdf5'
-                                formatSupported = true;
                                 % Try to read patient IDs from HDF5 metadata
                                 try
-                                    patientData = h5read(filePath, '/metadata/patientID');
+                                    patientData = obj.loadDatasetFile(filePath, '', '/metadata/patientID');
                                     if isstring(patientData)
                                         % Convert string array to cell array of char vectors
                                         patientData = cellstr(patientData);
                                     end
                                     if iscell(patientData)
                                         patientIDs.(splitName) = [patientIDs.(splitName), patientData{:}];
-                                    else
+                                    elseif ~isempty(patientData)
                                         patientIDs.(splitName){end+1} = patientData;
                                     end
                                 catch ME
@@ -563,20 +545,11 @@ classdef DatasetValidator < handle
                                         warning('DatasetValidator:H5MetadataReadError', 'Failed to read patientID from %s: %s', filePath, ME.message);
                                     end
                                 end
-                            otherwise
-                                % Format not supported for contamination check
                         end
                     catch ME
                         warning('DatasetValidator:SkippingFile', 'Skipping file %s due to error: %s', filePath, ME.message);
                     end
                 end
-            end
-            
-            % Warn if format doesn't support contamination checking
-            if ~formatSupported
-                result.warnings{end+1} = sprintf('Contamination check not supported for format: %s. Only MAT and HDF5 formats are supported.', obj.Format);
-                fprintf('  WARNING: %s\n', result.warnings{end});
-                return;
             end
             
             % Check for overlaps between all pairs of splits
@@ -662,6 +635,37 @@ classdef DatasetValidator < handle
                 else
                     fprintf(fid, '%s%s: %s\n', indentStr, fieldName, string(value));
                 end
+            end
+        end
+
+        function data = loadDatasetFile(obj, filePath, varName, h5Path)
+            % Helper to load data from file with format handling
+            %
+            % INPUTS:
+            %   filePath - Path to file
+            %   varName  - Variable name to load (for mat files)
+            %   h5Path   - Path to dataset within HDF5 (default: ['/' varName])
+            
+            if nargin < 4
+                h5Path = ['/' varName];
+            end
+            
+            data = [];
+            
+            switch obj.Format
+                case 'mat'
+                    if nargin >= 3 && ~isempty(varName)
+                        tmp = load(filePath, varName);
+                        if isfield(tmp, varName)
+                            data = tmp.(varName);
+                        end
+                    else
+                        data = load(filePath);
+                    end
+                case 'nifti'
+                    data = niftiread(filePath);
+                case 'hdf5'
+                    data = h5read(filePath, h5Path);
             end
         end
     end
