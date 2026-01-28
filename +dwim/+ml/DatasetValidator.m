@@ -27,6 +27,11 @@ classdef DatasetValidator < handle
         % Configuration for sampling
         NumSamplesDataQuality = 5   % Number of files to sample for data quality checks
         NumSamplesNormalization = 3 % Number of files to sample for normalization checks
+        
+        % Configuration for validation thresholds
+        ImbalanceWarningThreshold = 10  % Class imbalance ratio threshold for warnings
+        MinMaxTolerance = 0.01          % Tolerance for minmax normalization range checks
+        ZScoreTolerance = 0.1           % Tolerance for zscore normalization checks
     end
     
     methods
@@ -289,7 +294,7 @@ classdef DatasetValidator < handle
                         maxCount = max(counts);
                         imbalanceRatio = maxCount / minCount;
                         
-                        if imbalanceRatio > 10
+                        if imbalanceRatio > obj.ImbalanceWarningThreshold
                             result.warnings{end+1} = sprintf(...
                                 '%s split has severe class imbalance (ratio: %.1f:1)', ...
                                 splitName, imbalanceRatio);
@@ -423,16 +428,16 @@ classdef DatasetValidator < handle
                         result.ranges.(splitName) = [minVal, maxVal];
                         
                         % Check if values are outside expected range
-                        if obj.Manifest.normalization.method == "minmax"
+                        if strcmpi(obj.Manifest.normalization.method, "minmax")
                             expectedRange = obj.Manifest.normalization.range;
-                            if minVal < expectedRange(1) - 0.01 || maxVal > expectedRange(2) + 0.01
+                            if minVal < expectedRange(1) - obj.MinMaxTolerance || maxVal > expectedRange(2) + obj.MinMaxTolerance
                                 result.warnings{end+1} = sprintf(...
                                     '%s: Values [%.3f, %.3f] outside expected range [%.3f, %.3f]', ...
                                     splitName, minVal, maxVal, expectedRange(1), expectedRange(2));
                             end
-                        elseif obj.Manifest.normalization.method == "zscore"
+                        elseif strcmpi(obj.Manifest.normalization.method, "zscore")
                             % For z-score normalization, check if mean is close to 0 and std is close to 1
-                            if abs(meanVal) > 0.1 || abs(stdVal - 1.0) > 0.1
+                            if abs(meanVal) > obj.ZScoreTolerance || abs(stdVal - 1.0) > obj.ZScoreTolerance
                                 result.warnings{end+1} = sprintf(...
                                     '%s: Z-score stats [mean=%.3f, std=%.3f] deviate from expected [mean=0, std=1]', ...
                                     splitName, meanVal, stdVal);
@@ -499,6 +504,7 @@ classdef DatasetValidator < handle
             result = struct();
             result.passed = true;
             result.duplicates = {};
+            result.warnings = {};
             
             % Extract patient IDs from metadata if available
             splits = obj.getDatasetSplits();
@@ -536,6 +542,10 @@ classdef DatasetValidator < handle
                                 % Try to read patient IDs from HDF5 metadata
                                 try
                                     patientData = h5read(filePath, '/metadata/patientID');
+                                    if isstring(patientData)
+                                        % Convert string array to cell array of char vectors
+                                        patientData = cellstr(patientData);
+                                    end
                                     if iscell(patientData)
                                         patientIDs.(splitName) = [patientIDs.(splitName), patientData{:}];
                                     else
@@ -555,8 +565,8 @@ classdef DatasetValidator < handle
             
             % Warn if format doesn't support contamination checking
             if ~formatSupported
-                result.warnings = sprintf('Contamination check not supported for format: %s. Only MAT and HDF5 formats are supported.', obj.Format);
-                fprintf('  WARNING: %s\n', result.warnings);
+                result.warnings{end+1} = sprintf('Contamination check not supported for format: %s. Only MAT and HDF5 formats are supported.', obj.Format);
+                fprintf('  WARNING: %s\n', result.warnings{end});
                 return;
             end
             
