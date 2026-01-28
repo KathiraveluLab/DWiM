@@ -284,9 +284,9 @@ classdef DatasetValidator < handle
                 
                 % Compute distribution
                 if ~isempty(labels)
-                    uniqueLabels = unique(labels);
-                    counts = histcounts(labels, [uniqueLabels; max(uniqueLabels)+1]);
-                    result.distribution.(splitName) = struct('labels', uniqueLabels, 'counts', counts);
+                    [uniqueLabels, ~, J] = unique(labels);
+                    counts = accumarray(J, 1);
+                    result.distribution.(splitName) = struct('labels', uniqueLabels, 'counts', counts');
                     
                     % Check for imbalance
                     if length(uniqueLabels) > 1

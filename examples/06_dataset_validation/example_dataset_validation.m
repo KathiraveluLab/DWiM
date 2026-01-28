@@ -49,7 +49,8 @@ if ~exist(datasetPath, 'dir')
     builder.setNormalization('minmax');
     builder.setFormat('mat');
     builder.setBatchSize(2);
-    builder.addVolumes(volumes, metadata);
+    labels = cellfun(@(x) x.label, metadata, 'UniformOutput', false);
+    builder.addVolumes(volumes, labels, metadata);
     builder.build();
     
     fprintf('Sample dataset created at: %s\n\n', datasetPath);
