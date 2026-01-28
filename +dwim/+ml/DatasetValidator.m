@@ -187,7 +187,7 @@ classdef DatasetValidator < handle
                                 volumesIdx = find(strcmp({fileVars.name}, 'volumes'), 1);
                                 if ~isempty(volumesIdx)
                                     volSize = fileVars(volumesIdx).size;
-                                    volSize(end+1:3) = 1; % Pad with 1s if fewer than 3 dims
+                                    volSize = [volSize, ones(1, 3-length(volSize))]; % Pad with 1s if fewer than 3 dims
                                     volShape = volSize(1:3);  % [H, W, D]
                                 else
                                     continue;
@@ -195,12 +195,12 @@ classdef DatasetValidator < handle
                             case 'nifti'
                                 info = niftiinfo(filePath);
                                 s = info.ImageSize;
-                                s(end+1:3) = 1; % Pad with 1s if fewer than 3 dims
+                                s = [s, ones(1, 3-length(s))]; % Pad with 1s if fewer than 3 dims
                                 volShape = s(1:3);
                             case 'hdf5'
                                 info = h5info(filePath, '/volumes');
                                 s = info.Dataspace.Size;
-                                s(end+1:3) = 1; % Pad with 1s if fewer than 3 dims
+                                s = [s, ones(1, 3-length(s))]; % Pad with 1s if fewer than 3 dims
                                 volShape = s(1:3);
                         end
                         
@@ -537,6 +537,9 @@ classdef DatasetValidator < handle
                                             newIDs = cellfun(@(x) x.patientID, data.metadata(hasPatientIDFlags), 'UniformOutput', false);
                                             patientIDs.(splitName) = [patientIDs.(splitName), newIDs{:}];
                                         end
+                                    elseif isstruct(data.metadata) && isfield(data.metadata, 'patientID')
+                                        newIDs = {data.metadata.patientID};
+                                        patientIDs.(splitName) = [patientIDs.(splitName), newIDs{:}];
                                     end
                                 end
                             case 'hdf5'
