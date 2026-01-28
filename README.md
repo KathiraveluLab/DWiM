@@ -41,6 +41,7 @@ See the `examples/` directory for detailed usage examples:
 - `03_volume_pipeline/`: Complete 3D volume processing pipeline
 - `04_ml_dataset_builder/`: ML dataset preparation with train/val/test splits
 - `05_end_to_end_complete/`: **Complete architecture demonstration** (all 5 layers)
+- `06_dataset_validation/`: **Dataset validation and integrity checks**
 - `QUICK_START_GUIDE.m`: Quick reference for common workflows
 
 **Comprehensive Guides:**
