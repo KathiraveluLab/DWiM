@@ -178,31 +178,39 @@ fprintf('\n========================================\n');
 fprintf('VALIDATION SUMMARY\n');
 fprintf('========================================\n\n');
 
-% Count passed/failed checks
+% Count passed/failed/warning checks
 checkNames = fieldnames(allResults);
 passedCount = 0;
 failedCount = 0;
+warningCount = 0;
 
 for i = 1:length(checkNames)
     checkName = checkNames{i};
     result = allResults.(checkName);
     
     if isstruct(result) && isfield(result, 'passed')
-        if result.passed
-            passedCount = passedCount + 1;
-            fprintf('✓ %s\n', strrep(checkName, '_', ' '));
-        else
+        isFailed = ~result.passed;
+        hasWarnings = isfield(result, 'warnings') && ~isempty(result.warnings);
+
+        if isFailed
             failedCount = failedCount + 1;
-            fprintf('✗ %s\n', strrep(checkName, '_', ' '));
+            fprintf('✗ %s (FAILED)\n', strrep(checkName, '_', ' '));
+        elseif hasWarnings
+            warningCount = warningCount + 1;
+            fprintf('⚠ %s (WARNING)\n', strrep(checkName, '_', ' '));
+        else
+            passedCount = passedCount + 1;
+            fprintf('✓ %s (PASSED)\n', strrep(checkName, '_', ' '));
         end
     end
 end
 
-fprintf('\nTotal checks: %d\n', passedCount + failedCount);
+fprintf('\nTotal checks with status: %d\n', passedCount + failedCount + warningCount);
 fprintf('  Passed: %d\n', passedCount);
 fprintf('  Failed: %d\n', failedCount);
+fprintf('  Warnings: %d\n', warningCount);
 
-if failedCount == 0
+if failedCount == 0 && warningCount == 0
     fprintf('\n✓ Dataset is ready for ML training!\n');
 else
     fprintf('\n⚠ Dataset has issues that should be addressed.\n');

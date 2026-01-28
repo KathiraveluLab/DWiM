@@ -551,8 +551,12 @@ classdef DatasetValidator < handle
                                     else
                                         patientIDs.(splitName){end+1} = patientData;
                                     end
-                                catch
-                                    % Patient ID not found in this file
+                                catch ME
+                                    % It's expected that some files may not have patientID metadata.
+                                    % We only warn if the error is something other than 'dataset not found'.
+                                    if ~strcmp(ME.identifier, 'MATLAB:h5read:datasetNotFound')
+                                        warning('DatasetValidator:H5MetadataReadError', 'Failed to read patientID from %s: %s', filePath, ME.message);
+                                    end
                                 end
                             otherwise
                                 % Format not supported for contamination check
