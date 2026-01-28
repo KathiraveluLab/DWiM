@@ -23,6 +23,10 @@ classdef DatasetValidator < handle
         Manifest            % Loaded manifest data
         ValidationResults   % Structure with all validation results
         Format              % Dataset format (mat, nifti, hdf5)
+        
+        % Configuration for sampling
+        NumSamplesDataQuality = 5   % Number of files to sample for data quality checks
+        NumSamplesNormalization = 3 % Number of files to sample for normalization checks
     end
     
     methods
@@ -321,7 +325,7 @@ classdef DatasetValidator < handle
                 nanCount = 0;
                 infCount = 0;
                 
-                for f = 1:min(5, length(files))  % Sample first 5 files
+                for f = 1:min(obj.NumSamplesDataQuality, length(files))  % Sample files
                     filePath = fullfile(splitDir, files(f).name);
                     
                     try
@@ -395,7 +399,7 @@ classdef DatasetValidator < handle
                 
                 files = dir(fullfile(splitDir, ['*.' obj.Format]));
                 
-                for f = 1:min(3, length(files))  % Sample first 3 files
+                for f = 1:min(obj.NumSamplesNormalization, length(files))  % Sample files
                     filePath = fullfile(splitDir, files(f).name);
                     
                     try
@@ -582,6 +586,10 @@ classdef DatasetValidator < handle
             %   outputPath - Path to save report file
             
             fid = fopen(outputPath, 'w');
+            if fid == -1
+                error('DatasetValidator:FileOpenError', 'Could not open file for writing: %s', outputPath);
+            end
+            cleanupObj = onCleanup(@() fclose(fid));
             
             fprintf(fid, '========================================\n');
             fprintf(fid, 'DATASET VALIDATION REPORT\n');
@@ -605,7 +613,6 @@ classdef DatasetValidator < handle
             fprintf(fid, 'END OF REPORT\n');
             fprintf(fid, '========================================\n');
             
-            fclose(fid);
             fprintf('Report saved to: %s\n', outputPath);
         end
     end
