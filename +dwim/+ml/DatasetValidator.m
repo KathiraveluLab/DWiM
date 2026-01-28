@@ -147,7 +147,7 @@ classdef DatasetValidator < handle
                         end
                     catch ME
                         result.passed = false;
-                        result.corruptedFiles{end+1} = filePath;
+                        result.corruptedFiles{end+1} = sprintf('%s (Error: %s)', filePath, ME.message);
                     end
                 end
             end
@@ -280,7 +280,8 @@ classdef DatasetValidator < handle
                 end
                 
                 % Concatenate all labels at once
-                labels = vertcat(labelCells{:});
+                nonEmptyLabels = labelCells(~cellfun('isempty', labelCells));
+                labels = vertcat(nonEmptyLabels{:});
                 
                 % Compute distribution
                 if ~isempty(labels)
@@ -457,10 +458,10 @@ classdef DatasetValidator < handle
                 
                 if ~exist(splitDir, 'dir')
                     continue;
-                endsum([files.bytes]); filePath = fullfile(splitDir, files(f).name);
-                    fileInfo = dir(filePath);
-                    splitSize = splitSize + fileInfo.bytes;
                 end
+                
+                files = dir(fullfile(splitDir, ['*.' obj.Format]));
+                splitSize = sum([files.bytes]);
                 
                 splitSize_GiB = splitSize / (1024^3);
                 result.splitSizes_GiB.(splitName) = splitSize_GiB;
@@ -531,14 +532,17 @@ classdef DatasetValidator < handle
                                 % Try to read patient IDs from HDF5 metadata
                                 try
                                     patientData = obj.loadDatasetFile(filePath, '', '/metadata/patientID');
+                                    
                                     if isstring(patientData)
-                                        % Convert string array to cell array of char vectors
                                         patientData = cellstr(patientData);
+                                    elseif ~iscell(patientData) && ~isempty(patientData)
+                                        patientData = {char(patientData)}; % Convert scalar non-cell to cell of char
+                                    elseif isempty(patientData)
+                                        patientData = {}; % Ensure it's an empty cell array
                                     end
+                                    
                                     if iscell(patientData)
                                         patientIDs.(splitName) = [patientIDs.(splitName), patientData{:}];
-                                    elseif ~isempty(patientData)
-                                        patientIDs.(splitName){end+1} = patientData;
                                     end
                                 catch ME
                                     % It's expected that some files may not have patientID metadata.
@@ -634,7 +638,7 @@ classdef DatasetValidator < handle
                     fprintf(fid, '%s%s: %s\n', indentStr, fieldName, mat2str(value));
                 elseif islogical(value)
                     fprintf(fid, '%s%s: %s\n', indentStr, fieldName, ternary(value, 'true', 'false'));
-                elsestring(value{j})
+                elseif ischar(value) || isstring(value)
                     fprintf(fid, '%s%s: %s\n', indentStr, fieldName, string(value));
                 end
             end
