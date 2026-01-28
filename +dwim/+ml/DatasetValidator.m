@@ -531,9 +531,11 @@ classdef DatasetValidator < handle
                                 formatSupported = true;
                                 data = load(filePath);
                                 if isfield(data, 'metadata')
-                                    for i = 1:length(data.metadata)
-                                        if isfield(data.metadata{i}, 'patientID')
-                                            patientIDs.(splitName){end+1} = data.metadata{i}.patientID;
+                                    if iscell(data.metadata) && ~isempty(data.metadata)
+                                        hasPatientIDFlags = cellfun(@(x) isfield(x, 'patientID'), data.metadata);
+                                        if any(hasPatientIDFlags)
+                                            newIDs = cellfun(@(x) x.patientID, data.metadata(hasPatientIDFlags), 'UniformOutput', false);
+                                            patientIDs.(splitName) = [patientIDs.(splitName), newIDs{:}];
                                         end
                                     end
                                 end
