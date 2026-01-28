@@ -180,29 +180,31 @@ classdef DatasetValidator < handle
                     filePath = fullfile(splitDir, files(f).name);
                     
                     try
+                        rawSize = [];
                         switch obj.Format
                             case 'mat'
                                 % Use whos to avoid loading entire file
                                 fileVars = whos('-file', filePath);
                                 volumesIdx = find(strcmp({fileVars.name}, 'volumes'), 1);
                                 if ~isempty(volumesIdx)
-                                    volSize = fileVars(volumesIdx).size;
-                                    volSize = [volSize, ones(1, 3-length(volSize))]; % Pad with 1s if fewer than 3 dims
-                                    volShape = volSize(1:3);  % [H, W, D]
+                                    rawSize = fileVars(volumesIdx).size;
                                 else
                                     continue;
                                 end
                             case 'nifti'
                                 info = niftiinfo(filePath);
-                                s = info.ImageSize;
-                                s = [s, ones(1, 3-length(s))]; % Pad with 1s if fewer than 3 dims
-                                volShape = s(1:3);
+                                rawSize = info.ImageSize;
                             case 'hdf5'
                                 info = h5info(filePath, '/volumes');
-                                s = info.Dataspace.Size;
-                                s = [s, ones(1, 3-length(s))]; % Pad with 1s if fewer than 3 dims
-                                volShape = s(1:3);
+                                rawSize = info.Dataspace.Size;
                         end
+
+                        if isempty(rawSize)
+                            continue;
+                        end
+
+                        s = [rawSize, ones(1, 3-length(rawSize))]; % Pad with 1s if fewer than 3 dims
+                        volShape = s(1:3);
                         
                         % Check consistency
                         if isempty(expectedShape)

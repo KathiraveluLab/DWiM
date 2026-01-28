@@ -150,8 +150,8 @@ ranges:
   val: [0.001 0.999]
 
 --- DISK USAGE ---
-totalSize_GB: 2.45
-splitSizes_GB:
+totalSize_GiB: 2.45
+splitSizes_GiB:
   train: 1.72
   val: 0.37
   test: 0.36
