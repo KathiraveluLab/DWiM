@@ -23,6 +23,7 @@ classdef DatasetValidator < handle
         Manifest            % Loaded manifest data
         ValidationResults   % Structure with all validation results
         Format              % Dataset format (mat, nifti, hdf5)
+        Verbose = true      % Control console output verbosity
         
         % Configuration for sampling
         NumSamplesDataQuality = 5   % Number of files to sample for data quality checks
@@ -77,7 +78,7 @@ classdef DatasetValidator < handle
             % OUTPUTS:
             %   report - Structure with all validation results
             
-            fprintf('Running dataset validation checks...\n\n');
+            if obj.Verbose; fprintf('Running dataset validation checks...\n\n'); end
             
             % File existence checks
             obj.ValidationResults.fileIntegrity = obj.checkFileIntegrity();
@@ -102,13 +103,13 @@ classdef DatasetValidator < handle
             
             report = obj.ValidationResults;
             
-            fprintf('\nValidation complete!\n');
+            if obj.Verbose; fprintf('\nValidation complete!\n'); end
         end
         
         function result = checkFileIntegrity(obj)
             % Check if all expected files exist and are readable
             
-            fprintf('Checking file integrity...\n');
+            if obj.Verbose; fprintf('Checking file integrity...\n'); end
             result = struct();
             result.passed = true;
             result.missingFiles = {};
@@ -151,13 +152,13 @@ classdef DatasetValidator < handle
                 end
             end
             
-            fprintf('  File integrity: %s\n', ternary(result.passed, 'PASSED', 'FAILED'));
+            if obj.Verbose; fprintf('  File integrity: %s\n', ternary(result.passed, 'PASSED', 'FAILED')); end
         end
         
         function result = checkShapeConsistency(obj)
             % Verify all volumes have consistent shapes
             
-            fprintf('Checking shape consistency...\n');
+            if obj.Verbose; fprintf('Checking shape consistency...\n'); end
             result = struct();
             result.passed = true;
             result.shapes = struct();
@@ -203,8 +204,11 @@ classdef DatasetValidator < handle
                             continue;
                         end
 
-                        s = [rawSize, ones(1, 3-length(rawSize))]; % Pad with 1s if fewer than 3 dims
-                        volShape = s(1:3);
+                        if length(rawSize) < 3
+                            volShape = [rawSize, ones(1, 3-length(rawSize))];
+                        else
+                            volShape = rawSize(1:3);
+                        end
                         
                         % Check consistency
                         if isempty(expectedShape)
@@ -227,8 +231,8 @@ classdef DatasetValidator < handle
                 end
             end
             
-            fprintf('  Shape consistency: %s\n', ternary(result.passed, 'PASSED', 'FAILED'));
-            if ~isempty(expectedShape)
+            if obj.Verbose; fprintf('  Shape consistency: %s\n', ternary(result.passed, 'PASSED', 'FAILED')); end
+            if ~isempty(expectedShape) && obj.Verbose
                 fprintf('    Expected shape: [%d, %d, %d]\n', expectedShape);
             end
         end
@@ -236,7 +240,7 @@ classdef DatasetValidator < handle
         function result = analyzeLabelDistribution(obj)
             % Analyze label distribution across splits
             
-            fprintf('Analyzing label distribution...\n');
+            if obj.Verbose; fprintf('Analyzing label distribution...\n'); end
             result = struct();
             result.passed = true;
             result.distribution = struct();
@@ -247,7 +251,7 @@ classdef DatasetValidator < handle
             % Check if format is supported
             if ~ismember(obj.Format, {'mat', 'hdf5'})
                 result.warnings{end+1} = sprintf('Label distribution check not supported for format: %s. Only MAT and HDF5 formats are supported.', obj.Format);
-                fprintf('  WARNING: %s\n', result.warnings{end});
+                if obj.Verbose; fprintf('  WARNING: %s\n', result.warnings{end}); end
                 return;
             end
             
@@ -299,13 +303,13 @@ classdef DatasetValidator < handle
                 end
             end
             
-            fprintf('  Label distribution: %s\n', ternary(isempty(result.warnings), 'PASSED', 'WARNING'));
+            if obj.Verbose; fprintf('  Label distribution: %s\n', ternary(isempty(result.warnings), 'PASSED', 'WARNING')); end
         end
         
         function result = checkDataQuality(obj)
             % Check for NaN, Inf, and extreme outliers
             
-            fprintf('Checking data quality...\n');
+            if obj.Verbose; fprintf('Checking data quality...\n'); end
             result = struct();
             result.passed = true;
             result.issues = {};
@@ -360,13 +364,13 @@ classdef DatasetValidator < handle
                 end
             end
             
-            fprintf('  Data quality: %s\n', ternary(result.passed, 'PASSED', 'FAILED'));
+            if obj.Verbose; fprintf('  Data quality: %s\n', ternary(result.passed, 'PASSED', 'FAILED')); end
         end
         
         function result = verifyNormalization(obj)
             % Verify normalization is consistent
             
-            fprintf('Verifying normalization...\n');
+            if obj.Verbose; fprintf('Verifying normalization...\n'); end
             result = struct();
             result.passed = true;
             result.ranges = struct();
@@ -375,7 +379,7 @@ classdef DatasetValidator < handle
             % Check if format is supported
             if ~ismember(obj.Format, {'mat', 'hdf5'})
                 result.warnings{end+1} = sprintf('Normalization check not supported for format: %s. Only MAT and HDF5 formats are supported.', obj.Format);
-                fprintf('  WARNING: %s\n', result.warnings{end});
+                if obj.Verbose; fprintf('  WARNING: %s\n', result.warnings{end}); end
                 return;
             end
             
@@ -429,13 +433,13 @@ classdef DatasetValidator < handle
                 end
             end
             
-            fprintf('  Normalization: %s\n', ternary(isempty(result.warnings), 'PASSED', 'WARNING'));
+            if obj.Verbose; fprintf('  Normalization: %s\n', ternary(isempty(result.warnings), 'PASSED', 'WARNING')); end
         end
         
         function result = estimateDiskUsage(obj)
             % Estimate disk space occupied by dataset files
             
-            fprintf('Estimating disk usage...\n');
+            if obj.Verbose; fprintf('Estimating disk usage...\n'); end
             result = struct();
             result.totalSize_GiB = 0;
             result.splitSizes_GiB = struct();
@@ -453,13 +457,7 @@ classdef DatasetValidator < handle
                 
                 if ~exist(splitDir, 'dir')
                     continue;
-                end
-                
-                files = dir(fullfile(splitDir, ['*.' obj.Format]));
-                splitSize = 0;
-                
-                for f = 1:length(files)
-                    filePath = fullfile(splitDir, files(f).name);
+                endsum([files.bytes]); filePath = fullfile(splitDir, files(f).name);
                     fileInfo = dir(filePath);
                     splitSize = splitSize + fileInfo.bytes;
                 end
@@ -469,18 +467,20 @@ classdef DatasetValidator < handle
                 result.totalSize_GiB = result.totalSize_GiB + splitSize_GiB;
             end
             
-            fprintf('  Total size: %.2f GiB\n', result.totalSize_GiB);
-            splitNames = fieldnames(result.splitSizes_GiB);
-            for i = 1:length(splitNames)
-                splitName = splitNames{i};
-                fprintf('    %s: %.2f GiB\n', splitName, result.splitSizes_GiB.(splitName));
+            if obj.Verbose
+                fprintf('  Total size: %.2f GiB\n', result.totalSize_GiB);
+                splitNames = fieldnames(result.splitSizes_GiB);
+                for i = 1:length(splitNames)
+                    splitName = splitNames{i};
+                    fprintf('    %s: %.2f GiB\n', splitName, result.splitSizes_GiB.(splitName));
+                end
             end
         end
         
         function result = checkCrossSplitContamination(obj)
             % Check for duplicate samples across train/val/test splits
             
-            fprintf('Checking for cross-split contamination...\n');
+            if obj.Verbose; fprintf('Checking for cross-split contamination...\n'); end
             result = struct();
             result.passed = true;
             result.duplicates = {};
@@ -493,7 +493,7 @@ classdef DatasetValidator < handle
             % Check if format is supported
             if ~ismember(obj.Format, {'mat', 'hdf5'})
                 result.warnings{end+1} = sprintf('Contamination check not supported for format: %s. Only MAT and HDF5 formats are supported.', obj.Format);
-                fprintf('  WARNING: %s\n', result.warnings{end});
+                if obj.Verbose; fprintf('  WARNING: %s\n', result.warnings{end}); end
                 return;
             end
             
@@ -570,7 +570,7 @@ classdef DatasetValidator < handle
                 end
             end
             
-            fprintf('  Contamination check: %s\n', ternary(result.passed, 'PASSED', 'FAILED'));
+            if obj.Verbose; fprintf('  Contamination check: %s\n', ternary(result.passed, 'PASSED', 'FAILED')); end
         end
         
         function generateReport(obj, outputPath)
@@ -607,7 +607,7 @@ classdef DatasetValidator < handle
             fprintf(fid, 'END OF REPORT\n');
             fprintf(fid, '========================================\n');
             
-            fprintf('Report saved to: %s\n', outputPath);
+            if obj.Verbose; fprintf('Report saved to: %s\n', outputPath); end
         end
     end
     
@@ -634,7 +634,7 @@ classdef DatasetValidator < handle
                     fprintf(fid, '%s%s: %s\n', indentStr, fieldName, mat2str(value));
                 elseif islogical(value)
                     fprintf(fid, '%s%s: %s\n', indentStr, fieldName, ternary(value, 'true', 'false'));
-                else
+                elsestring(value{j})
                     fprintf(fid, '%s%s: %s\n', indentStr, fieldName, string(value));
                 end
             end
