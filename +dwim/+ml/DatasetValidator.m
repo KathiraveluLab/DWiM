@@ -506,13 +506,15 @@ classdef DatasetValidator < handle
                     continue;
                 end
                 
-                patientIDs.(splitName) = {};
                 files = dir(fullfile(splitDir, ['*.' obj.Format]));
+                % Pre-allocate a cell array to hold IDs from all files in the split for efficiency.
+                splitPatientIDs_cell = cell(1, length(files));
                 
                 for f = 1:length(files)
                     filePath = fullfile(splitDir, files(f).name);
                     
                     try
+                        ids_from_file = {};
                         switch obj.Format
                             case 'mat'
                                 metadata = obj.loadDatasetFile(filePath, 'metadata');
@@ -520,12 +522,10 @@ classdef DatasetValidator < handle
                                     if iscell(metadata) && ~isempty(metadata)
                                         hasPatientIDFlags = cellfun(@(x) isfield(x, 'patientID'), metadata);
                                         if any(hasPatientIDFlags)
-                                            newIDs = cellfun(@(x) x.patientID, metadata(hasPatientIDFlags), 'UniformOutput', false);
-                                            patientIDs.(splitName) = [patientIDs.(splitName), newIDs{:}];
+                                            ids_from_file = cellfun(@(x) x.patientID, metadata(hasPatientIDFlags), 'UniformOutput', false);
                                         end
                                     elseif isstruct(metadata) && isfield(metadata, 'patientID')
-                                        newIDs = {metadata.patientID};
-                                        patientIDs.(splitName) = [patientIDs.(splitName), newIDs{:}];
+                                        ids_from_file = {metadata.patientID};
                                     end
                                 end
                             case 'hdf5'
@@ -542,7 +542,7 @@ classdef DatasetValidator < handle
                                     end
                                     
                                     if iscell(patientData)
-                                        patientIDs.(splitName) = [patientIDs.(splitName), patientData{:}];
+                                        ids_from_file = patientData;
                                     end
                                 catch ME
                                     % It's expected that some files may not have patientID metadata.
@@ -552,10 +552,13 @@ classdef DatasetValidator < handle
                                     end
                                 end
                         end
+                        splitPatientIDs_cell{f} = ids_from_file;
                     catch ME
                         warning('DatasetValidator:SkippingFile', 'Skipping file %s due to error: %s', filePath, ME.message);
                     end
                 end
+                % Concatenate all collected IDs at once.
+                patientIDs.(splitName) = [splitPatientIDs_cell{:}];
             end
             
             % Check for overlaps between all pairs of splits
