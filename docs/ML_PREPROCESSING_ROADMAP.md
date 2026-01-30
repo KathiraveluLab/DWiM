@@ -88,12 +88,22 @@ config_3d_volume = struct(...
 **Challenge**: Medical datasets can exceed RAM (e.g., 512³ float32 = 512 MB per volume).
 
 **Strategies Implemented**:
+
 1. **Selective Variable Loading**:
-   ```matlab
-   % Load only 'labels', not entire file
-   data = load(filePath, 'labels');
-   ```
-2. **Metadata-First Inspection**: Use `whos('-file', path)` to check dimensions before loading
+    ```matlab
+    % Load only 'labels', not entire file
+    data = load(filePath, 'labels');
+    ```
+2. **Metadata-First Inspection**: Use `whos('-file', path)` to check dimensions before loading:
+    ```matlab
+    % Get info about variables in a MAT-file without loading it
+    info = whos('-file', filePath);
+    % Example: Check if a variable is too large before loading
+    idx = strcmp({info.name}, 'largeVolume');
+    if any(idx) && info(idx).bytes > availableMemory
+         error('Not enough memory to load largeVolume.');
+    end
+    ```
 3. **Pre-Allocation**: Pre-size arrays in contamination checks to avoid repeated memory reallocation
 
 **Future**: HDF5 memory-mapped arrays for out-of-core processing.
@@ -182,15 +192,18 @@ Validate Dataset → Load Data → Train Model
 
 **Problem**: ML workflows use mixed formats (`.mat` for MATLAB, `.h5` for Python interop, `.nii` for neuroimaging).
 
-**Solution**: Unified `loadDatasetFile()` private method:
+
+**Solution**: Unified `loadDatasetFile()` private method using name-value pairs for format-specific arguments:
 ```matlab
-function data = loadDatasetFile(obj, filePath, varName, h5Path)
+function data = loadDatasetFile(obj, filePath, varargin)
+    % Convert name-value pairs to a struct for easy access
+    opts = struct(varargin{:});
     switch obj.Format
         case 'mat'
-            tmp = load(filePath, varName);
-            data = tmp.(varName);
+            tmp = load(filePath, opts.VarName);
+            data = tmp.(opts.VarName);
         case 'hdf5'
-            data = h5read(filePath, h5Path);
+            data = h5read(filePath, opts.H5Path);
         case 'nifti'
             data = niftiread(filePath);
     end
