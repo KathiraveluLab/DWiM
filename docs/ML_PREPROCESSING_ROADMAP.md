@@ -342,7 +342,7 @@ config = config_full_pipeline;  % From config file
 - **Functions**: `camelCase` (e.g., `resampleVolume`)
 - **Classes**: `PascalCase` (e.g., `DatasetValidator`)
 - **Properties**: `PascalCase` (e.g., `Verbose`)
-- **Comments**: Use MATLAB doc format (`% FUNCTIONNAME Description`)
+- **Comments**: Use MATLAB help text format for function/class headers, and clear, concise inline comments for complex logic.
 
 ### Testing Protocol
 1. Create synthetic test data
