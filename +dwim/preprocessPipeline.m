@@ -43,7 +43,7 @@ function [output, metadata] = preprocessPipeline(input, config)
     
     % Validate config
     if ~isfield(config, 'inputType')
-        error('dwim:preprocessPipeline:MissingConfig', 'Config must specify inputType');
+        error('dwim:preprocessPipeline:MissingConfig', 'Config must specify inputType (valid options: ''filepath'', ''dicomdir'', ''image'', ''volume'')');
     end
     
     if ~isfield(config, 'steps')
