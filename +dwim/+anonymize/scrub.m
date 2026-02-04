@@ -14,7 +14,6 @@ function outputFile = scrub(inputFile, outputFolder)
     end
 
     % 2. Determine Output Path
-    % If no folder provided, create a 'anonymized' subfolder
     [p, f, ext] = fileparts(inputFile);
     if outputFolder == ""
         outputFolder = fullfile(p, 'anonymized');
@@ -28,7 +27,6 @@ function outputFile = scrub(inputFile, outputFolder)
 
     % 3. Run Anonymization
     try
-        % dicomanon removes PatientName, PatientID, etc. by default.
         dicomanon(char(inputFile), char(outputFile));
     catch ME
         error('DWiM:AnonymizeFailed', 'Failed to scrub file: %s', ME.message);
@@ -39,3 +37,4 @@ function outputFile = scrub(inputFile, outputFolder)
         error('DWiM:WriteError', 'Anonymization ran but no file was created.');
     end
 end
+% Fixed: Added newline at end of file for Git compliance
