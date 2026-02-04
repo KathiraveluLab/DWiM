@@ -25,7 +25,7 @@
 ### Anatomical Coordinate Systems
 
 #### Patient Coordinate System (DICOM Standard)
-- **X-axis**: Left (-) to Right (+) 
+- **X-axis**: Right (-) to Left (+)
 - **Y-axis**: Posterior (-) to Anterior (+)
 - **Z-axis**: Inferior (-) to Superior (+)
 

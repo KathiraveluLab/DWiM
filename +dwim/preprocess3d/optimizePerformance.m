@@ -191,9 +191,11 @@ function results = optimizePerformance(volume, varargin)
             
             volumeRatio = prod(size(resampled)) / prod(size(volume));
             
-            results.scaling.(sprintf('spacing_%.2f', spacing)).time = scalingTime;
-            results.scaling.(sprintf('spacing_%.2f', spacing)).volumeRatio = volumeRatio;
-            results.scaling.(sprintf('spacing_%.2f', spacing)).outputSize = size(resampled);
+            % Create valid field name
+            fieldName = genvarname(sprintf('spacing_%.2f', spacing));
+            results.scaling.(fieldName).time = scalingTime;
+            results.scaling.(fieldName).volumeRatio = volumeRatio;
+            results.scaling.(fieldName).outputSize = size(resampled);
             
             if params.Verbose
                 fprintf('  %.2f mm: %.3f sec, %.1fx volume, [%d %d %d]\n', ...
