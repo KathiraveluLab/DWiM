@@ -1,244 +1,116 @@
-function [isValid, report] = validateImageForML(image, varargin)
+function [isValid, info] = validateImageForML(image, varargin)
 %VALIDATEIMAGEFORML Validate DICOM image for ML preprocessing.
 %
-%   [isValid, report] = dwim.preprocess.validateImageForML(image)
+%   [isValid, info] = dwim.preprocess.validateImageForML(image)
 %       Validates if a DICOM image is suitable for ML preprocessing.
 %
-%   [isValid, report] = dwim.preprocess.validateImageForML(image, 'MinSize', 64)
+%   [isValid, info] = dwim.preprocess.validateImageForML(image, 'MinSize', [256, 256])
 %       Validates with custom minimum size requirements.
 %
 %   Inputs:
-%       image - 2D numeric array
+%       image   - Image array (2D or 3D)
 %
 %   Name-Value Arguments:
-%       MinSize - Minimum dimension (default: 32)
-%       MaxSize - Maximum dimension (default: 2048)
-%       AllowNaN - Allow NaN values (default: false)
-%       AllowInf - Allow Inf values (default: false)
-%       RequireNormalized - Require values in [0,1] (default: false)
-%       Verbose - Display validation details (default: true)
+%       MinSize - Minimum required dimensions [height, width] (default: [128, 128])
+%       MaxSize - Maximum allowed dimensions [height, width] (default: [2048, 2048])
 %
 %   Outputs:
-%       isValid - Boolean indicating if image passes all checks
-%       report - Structure with detailed validation results
+%       isValid - Logical indicating if image passes validation
+%       info    - Structure with validation details and recommendations
 %
 %   Example:
-%       [valid, report] = dwim.preprocess.validateImageForML(image);
+%       [valid, details] = dwim.preprocess.validateImageForML(ctImage);
 %       if ~valid
-%           fprintf('Validation failed: %s\n', report.failureReason);
+%           fprintf('Issues: %s\n', strjoin(details.issues, ', '));
 %       end
 
     arguments
         image {mustBeNumeric}
+    end
+    
+    arguments (Repeating)
         varargin
     end
     
-    % Parse arguments
+    % Parse optional arguments
     p = inputParser;
-    addParameter(p, 'MinSize', 32, @(x) isnumeric(x) && isscalar(x) && x > 0);
-    addParameter(p, 'MaxSize', 2048, @(x) isnumeric(x) && isscalar(x) && x > 0);
-    addParameter(p, 'AllowNaN', false, @islogical);
-    addParameter(p, 'AllowInf', false, @islogical);
-    addParameter(p, 'RequireNormalized', false, @islogical);
-    addParameter(p, 'Verbose', true, @islogical);
+    addParameter(p, 'MinSize', [128, 128], @(x) isnumeric(x) && length(x) == 2);
+    addParameter(p, 'MaxSize', [2048, 2048], @(x) isnumeric(x) && length(x) == 2);
     parse(p, varargin{:});
-    params = p.Results;
     
-    % Initialize report
-    report = struct();
-    report.timestamp = datetime('now');
-    report.imageSize = size(image);
-    report.dataType = class(image);
-    report.checks = struct();
-    report.passed = true;
-    report.failureReason = '';
+    minSize = p.Results.MinSize;
+    maxSize = p.Results.MaxSize;
     
-    if params.Verbose
-        fprintf('DWiM Image Validation\n');
-        fprintf('=====================\n');
-        fprintf('Image size: [%d %d]\n', size(image));
-        fprintf('Data type: %s\n', class(image));
-    end
+    % Initialize validation results
+    isValid = true;
+    issues = {};
+    warnings = {};
+    recommendations = {};
     
-    % Check 1: Dimensionality
-    if params.Verbose
-        fprintf('Checking dimensionality... ');
-    end
+    % Get image dimensions
+    [height, width, depth] = size(image);
     
-    if ndims(image) ~= 2
-        report.checks.dimensionality.passed = false;
-        report.checks.dimensionality.message = sprintf('Expected 2D image, got %dD', ndims(image));
-        report.passed = false;
-        report.failureReason = 'Invalid dimensionality';
-        if params.Verbose
-            fprintf('FAILED (%s)\n', report.checks.dimensionality.message);
-        end
+    % Check 1: Image dimensions
+    if height < minSize(1) || width < minSize(2)
         isValid = false;
-        return;
+        issues{end+1} = sprintf('Image too small (%dx%d), minimum required: %dx%d', ...
+            height, width, minSize(1), minSize(2));
+        recommendations{end+1} = 'Consider upsampling or using different image';
     end
     
-    report.checks.dimensionality.passed = true;
-    if params.Verbose
-        fprintf('PASSED\n');
+    if height > maxSize(1) || width > maxSize(2)
+        warnings{end+1} = sprintf('Image very large (%dx%d), may need downsampling', height, width);
+        recommendations{end+1} = 'Consider downsampling for faster processing';
     end
     
-    % Check 2: Size constraints
-    if params.Verbose
-        fprintf('Checking size constraints... ');
+    % Check 2: Data type and range
+    if ~isa(image, 'double') && ~isa(image, 'single') && ~isa(image, 'int16') && ~isa(image, 'uint16')
+        warnings{end+1} = sprintf('Unusual data type: %s', class(image));
+        recommendations{end+1} = 'Convert to double or int16 for CT processing';
     end
     
-    [rows, cols] = size(image);
+    % Check 3: Value range (typical for CT)
+    minVal = double(min(image(:)));
+    maxVal = double(max(image(:)));
     
-    sizeValid = true;
-    sizeMessages = {};
-    
-    if rows < params.MinSize || cols < params.MinSize
-        sizeValid = false;
-        sizeMessages{end+1} = sprintf('Image too small (%dx%d, min %d)', ...
-                                       rows, cols, params.MinSize);
+    if minVal >= 0 && maxVal <= 255
+        warnings{end+1} = 'Values in [0,255] range - may be pre-windowed or not raw HU';
+        recommendations{end+1} = 'Verify if this is raw DICOM data or pre-processed';
+    elseif minVal < -2000 || maxVal > 4000
+        warnings{end+1} = sprintf('Unusual HU range: [%.1f, %.1f]', minVal, maxVal);
+        recommendations{end+1} = 'Check if values are in Hounsfield Units';
     end
     
-    if rows > params.MaxSize || cols > params.MaxSize
-        sizeValid = false;
-        sizeMessages{end+1} = sprintf('Image too large (%dx%d, max %d)', ...
-                                       rows, cols, params.MaxSize);
+    % Check 4: Image content
+    if std(double(image(:))) < 1
+        isValid = false;
+        issues{end+1} = 'Image has very low variance - may be blank or corrupted';
+        recommendations{end+1} = 'Check DICOM file integrity';
     end
     
-    report.checks.sizeConstraints.passed = sizeValid;
-    report.checks.sizeConstraints.messages = sizeMessages;
+    % Check 5: 3D volume considerations
+    if depth > 1
+        warnings{end+1} = sprintf('3D volume with %d slices detected', depth);
+        recommendations{end+1} = 'Consider slice-by-slice processing or volume-based ML models';
+    end
     
-    if ~sizeValid
-        report.passed = false;
-        report.failureReason = strjoin(sizeMessages, '; ');
-        if params.Verbose
-            fprintf('FAILED (%s)\n', report.failureReason);
-        end
+    % Compile results
+    info = struct();
+    info.dimensions = [height, width, depth];
+    info.dataType = class(image);
+    info.valueRange = [minVal, maxVal];
+    info.variance = std(double(image(:)));
+    info.issues = issues;
+    info.warnings = warnings;
+    info.recommendations = recommendations;
+    info.isValid = isValid;
+    
+    % Overall assessment
+    if isValid && isempty(warnings)
+        info.assessment = 'Image is ready for ML preprocessing';
+    elseif isValid
+        info.assessment = 'Image is valid but has minor concerns';
     else
-        if params.Verbose
-            fprintf('PASSED\n');
-        end
-    end
-    
-    % Check 3: Data quality (NaN/Inf)
-    if params.Verbose
-        fprintf('Checking data quality... ');
-    end
-    
-    hasNaN = any(isnan(image(:)));
-    hasInf = any(isinf(image(:)));
-    
-    dataQualityValid = true;
-    dataQualityMessages = {};
-    
-    if hasNaN && ~params.AllowNaN
-        dataQualityValid = false;
-        nanCount = sum(isnan(image(:)));
-        dataQualityMessages{end+1} = sprintf('Contains %d NaN values', nanCount);
-    end
-    
-    if hasInf && ~params.AllowInf
-        dataQualityValid = false;
-        infCount = sum(isinf(image(:)));
-        dataQualityMessages{end+1} = sprintf('Contains %d Inf values', infCount);
-    end
-    
-    report.checks.dataQuality.passed = dataQualityValid;
-    report.checks.dataQuality.hasNaN = hasNaN;
-    report.checks.dataQuality.hasInf = hasInf;
-    report.checks.dataQuality.messages = dataQualityMessages;
-    
-    if ~dataQualityValid
-        report.passed = false;
-        if isempty(report.failureReason)
-            report.failureReason = strjoin(dataQualityMessages, '; ');
-        else
-            report.failureReason = [report.failureReason '; ' strjoin(dataQualityMessages, '; ')];
-        end
-        if params.Verbose
-            fprintf('FAILED (%s)\n', strjoin(dataQualityMessages, '; '));
-        end
-    else
-        if params.Verbose
-            fprintf('PASSED\n');
-        end
-    end
-    
-    % Check 4: Value range
-    if params.Verbose
-        fprintf('Checking value range... ');
-    end
-    
-    minVal = min(image(:));
-    maxVal = max(image(:));
-    meanVal = mean(image(:));
-    stdVal = std(double(image(:)));
-    
-    report.checks.valueRange.min = minVal;
-    report.checks.valueRange.max = maxVal;
-    report.checks.valueRange.mean = meanVal;
-    report.checks.valueRange.std = stdVal;
-    report.checks.valueRange.passed = true;
-    
-    % Check normalization if required
-    if params.RequireNormalized
-        if minVal < 0 || maxVal > 1
-            report.checks.valueRange.passed = false;
-            report.passed = false;
-            normalizeMsg = sprintf('Values not normalized (range: [%.2f, %.2f])', minVal, maxVal);
-            if isempty(report.failureReason)
-                report.failureReason = normalizeMsg;
-            else
-                report.failureReason = [report.failureReason '; ' normalizeMsg];
-            end
-            if params.Verbose
-                fprintf('FAILED (%s)\n', normalizeMsg);
-            end
-        else
-            if params.Verbose
-                fprintf('PASSED (normalized range: [%.2f, %.2f])\n', minVal, maxVal);
-            end
-        end
-    else
-        if params.Verbose
-            fprintf('PASSED (range: [%.2f, %.2f], mean: %.2f)\n', minVal, maxVal, meanVal);
-        end
-    end
-    
-    % Check 5: Empty image
-    if params.Verbose
-        fprintf('Checking for empty image... ');
-    end
-    
-    isEmpty = all(image(:) == 0) || all(isnan(image(:)));
-    
-    report.checks.emptyImage.passed = ~isEmpty;
-    
-    if isEmpty
-        report.passed = false;
-        emptyMsg = 'Image is empty (all zeros or NaN)';
-        if isempty(report.failureReason)
-            report.failureReason = emptyMsg;
-        else
-            report.failureReason = [report.failureReason '; ' emptyMsg];
-        end
-        if params.Verbose
-            fprintf('FAILED (%s)\n', emptyMsg);
-        end
-    else
-        if params.Verbose
-            fprintf('PASSED\n');
-        end
-    end
-    
-    % Final validation result
-    isValid = report.passed;
-    
-    if params.Verbose
-        fprintf('=====================\n');
-        if isValid
-            fprintf('✓ Image validation PASSED\n');
-        else
-            fprintf('✗ Image validation FAILED: %s\n', report.failureReason);
-        end
+        info.assessment = 'Image has issues that need to be addressed';
     end
 end

@@ -1,0 +1,111 @@
+DWiM Architecture Diagram
+========================
+
+High-Level Data Flow:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           DWiM Processing Pipeline                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   DICOM Input   │ -> │  Preprocessing   │ -> │  Volume Stage   │ -> │     ML Ready    │
+│                 │    │                  │    │                 │    │                 │
+│ • File Discovery│    │ • Validation     │    │ • Assembly      │    │ • Training Data │
+│ • Metadata Ext. │    │ • Windowing      │    │ • Orientation   │    │ • Inference     │
+│ • Series Group  │    │ • Normalization  │    │ • Resampling    │    │ • Analysis      │
+└─────────────────┘    └──────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │                       │
+         ▼                       ▼                       ▼                       ▼
+    Raw Files              Quality Checks           3D Volumes            ML Models
+
+Detailed Component Flow:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  DICOM Series Files                                                         │
+│         ↓                                                                   │
+│  ┌─────────────────┐                                                        │
+│  │ File Discovery  │  (findDicomFiles)                                      │
+│  │ • .dcm, .dicom  │                                                        │
+│  │ • Extensionless │                                                        │
+│  └─────────────────┘                                                        │
+│         ↓                                                                   │
+│  ┌─────────────────┐                                                        │
+│  │ Metadata Loading│  (dicominfo)                                           │
+│  │ • ImagePosition │                                                        │
+│  │ • Orientation   │                                                        │
+│  │ • PixelSpacing  │                                                        │
+│  └─────────────────┘                                                        │
+│         ↓                                                                   │
+│  ┌─────────────────┐                                                        │
+│  │ Slice Sorting   │  (sortSlicesByPosition)                                │
+│  │ • By Z-position │                                                        │
+│  │ • ImagePosition │                                                        │
+│  └─────────────────┘                                                        │
+│         ↓                                                                   │
+│  ┌────────────────────┐                                                     │
+│  │ Volume Assembly    │  (assembleVolume)                                   │
+│  │ • 3D Reconstruction│                                                     │
+│  │ • Error Handling   │                                                     │
+│  └────────────────────┘                                                     │
+│         ↓                                                                   │
+│  ┌─────────────────┐                                                        │
+│  │ Preprocessing   │  (Optional)                                            │
+│  │ • Windowing     │                                                        │
+│  │ • Normalization │                                                        │
+│  └─────────────────┘                                                        │
+│         ↓                                                                   │
+│  ┌─────────────────┐                                                        │
+│  │ Orientation     │  (correctOrientation)                                  │
+│  │ • RAS/LPS/LAS   │                                                        │
+│  │ • Anatomical Std│                                                        │
+│  └─────────────────┘                                                        │
+│         ↓                                                                   │
+│  ┌─────────────────┐                                                        │
+│  │ Resampling      │  (resampleVolume)                                      │
+│  │ • Isotropic     │                                                        │
+│  │ • GPU Support   │                                                        │
+│  └─────────────────┘                                                        │
+│         ↓                                                                   │
+│  ┌─────────────────┐                                                        │
+│  │ Validation      │  (validateVolumeForML)                                 │
+│  │ • Quality Checks│                                                        │
+│  │ • ML Readiness  │                                                        │
+│  └─────────────────┘                                                        │
+│         ↓                                                                   │
+│  ┌─────────────────┐                                                        │
+│  │   ML Ready      │                                                        │
+│  │   3D Volume     │                                                        │
+│  └─────────────────┘                                                        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+API Layers:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              API Hierarchy                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+High-Level API:
+├── buildVolumeFromSeries()     [Complete pipeline in one call]
+
+Mid-Level APIs:
+├── assembleVolume()            [DICOM → 3D Volume]
+├── correctOrientation()        [Orientation correction]
+├── resampleVolume()            [Isotropic resampling]
+└── validateVolumeForML()       [Quality validation]
+
+Low-Level APIs:
+├── applyWindowPreset()         [CT windowing]
+├── normalizeHU()               [Value scaling]
+├── connectToOrthanc()          [PACS connection]
+└── extractMetadata()           [DICOM processing]
+
+Data Structures:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            Data Flow                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Input:  DICOM Directory → File Paths → DICOM Info → Sorted Metadata
+Output: 3D Volume Array + Voxel Spacing + Processing Metadata
+
+Volume: [rows × cols × slices] array
+Spacing: [x, y, z] in mm
+Metadata: Struct with processing details, timing, validation results"" 

@@ -1,238 +1,169 @@
-function [isValid, report] = validateVolumeForML(volume, varargin)
+function [isValid, info] = validateVolumeForML(volume, varargin)
 %VALIDATEVOLUMEFORML Validate 3D medical volume for ML workflows
 %
-%   [isValid, report] = dwim.preprocess3d.validateVolumeForML(volume)
+%   [isValid, info] = dwim.preprocess3d.validateVolumeForML(volume)
 %       Validates if a 3D medical volume is suitable for ML preprocessing
 %
-%   [isValid, report] = dwim.preprocess3d.validateVolumeForML(volume, 'MinSlices', 10)
+%   [isValid, info] = dwim.preprocess3d.validateVolumeForML(volume, 'MinSlices', 10)
 %       Validates with custom minimum slice requirements
 %
 %   Inputs:
 %       volume - 3D numeric array representing medical volume
 %
 %   Name-Value Arguments:
-%       MinSlices - Minimum number of slices required (default: 10)
-%       MaxSlices - Maximum number of slices allowed (default: 1000)
-%       MinSize - Minimum in-plane dimension (default: 32)
-%       MaxSize - Maximum in-plane dimension (default: 2048)
-%       AllowNaN - Allow NaN values (default: false)
-%       AllowInf - Allow Inf values (default: false)
-%       Verbose - Display validation details (default: true)
+%       MinSize - Minimum required dimensions [rows, cols, slices] (default: [64, 64, 10])
+%       MaxSize - Maximum allowed dimensions [rows, cols, slices] (default: [1024, 1024, 1000])
+%       MinSlices - Minimum number of slices required (default: 5)
+%       MaxSlices - Maximum number of slices allowed (default: 2000)
+%       CheckIsotropic - Check if voxel spacing is isotropic (default: true)
+%       MemoryLimitGB - Maximum memory usage in GB (default: 8)
 %
 %   Outputs:
-%       isValid - Boolean indicating if volume passes all checks
-%       report - Structure with detailed validation results
+%       isValid - Logical indicating if volume passes validation
+%       info    - Structure with validation details and recommendations
 %
 %   Example:
-%       [valid, report] = dwim.preprocess3d.validateVolumeForML(volume);
+%       [valid, details] = dwim.preprocess3d.validateVolumeForML(ctVolume);
 %       if ~valid
-%           fprintf('Validation failed: %s\n', report.failureReason);
+%           fprintf('Issues: %s\n', strjoin(details.issues, '; '));
 %       end
 
     arguments
         volume {mustBeNumeric}
-        varargin
     end
-    
-    % Parse arguments
+
+    % Parse optional arguments
     p = inputParser;
-    addParameter(p, 'MinSlices', 10, @(x) isnumeric(x) && isscalar(x) && x > 0);
-    addParameter(p, 'MaxSlices', 1000, @(x) isnumeric(x) && isscalar(x) && x > 0);
-    addParameter(p, 'MinSize', 32, @(x) isnumeric(x) && isscalar(x) && x > 0);
-    addParameter(p, 'MaxSize', 2048, @(x) isnumeric(x) && isscalar(x) && x > 0);
-    addParameter(p, 'AllowNaN', false, @islogical);
-    addParameter(p, 'AllowInf', false, @islogical);
-    addParameter(p, 'Verbose', true, @islogical);
+    addParameter(p, 'MinSize', [64, 64, 5], @(x) isnumeric(x) && length(x) == 3);
+    addParameter(p, 'MaxSize', [1024, 1024, 1000], @(x) isnumeric(x) && length(x) == 3);
+    addParameter(p, 'CheckIsotropic', true, @islogical);
+    addParameter(p, 'MemoryLimitGB', 8, @isnumeric);
     parse(p, varargin{:});
+
     params = p.Results;
-    
-    % Initialize report
-    report = struct();
-    report.timestamp = datetime('now');
-    report.volumeSize = size(volume);
-    report.dataType = class(volume);
-    report.checks = struct();
-    report.passed = true;
-    report.failureReason = '';
-    
-    if params.Verbose
-        fprintf('DWiM Volume Validation\n');
-        fprintf('======================\n');
-        fprintf('Volume size: [%d %d %d]\n', size(volume));
-        fprintf('Data type: %s\n', class(volume));
-    end
-    
-    % Check 1: Dimensionality
-    if params.Verbose
-        fprintf('Checking dimensionality... ');
-    end
-    
-    if ndims(volume) ~= 3
-        report.checks.dimensionality.passed = false;
-        report.checks.dimensionality.message = sprintf('Expected 3D volume, got %dD', ndims(volume));
-        report.passed = false;
-        report.failureReason = 'Invalid dimensionality';
-        if params.Verbose
-            fprintf('FAILED (%s)\n', report.checks.dimensionality.message);
-        end
-        isValid = false;
-        return;
-    end
-    
-    report.checks.dimensionality.passed = true;
-    if params.Verbose
-        fprintf('PASSED\n');
-    end
-    
-    % Check 2: Size constraints
-    if params.Verbose
-        fprintf('Checking size constraints... ');
-    end
-    
+
+    % Initialize validation results
+    isValid = true;
+    issues = {};
+    warnings = {};
+    recommendations = {};
+
+    % Get volume dimensions
     [rows, cols, slices] = size(volume);
-    
-    sizeValid = true;
-    sizeMessages = {};
-    
-    if slices < params.MinSlices
-        sizeValid = false;
-        sizeMessages{end+1} = sprintf('Too few slices (%d < %d)', slices, params.MinSlices);
+
+    % Check 1: Volume dimensions
+    if rows < params.MinSize(1) || cols < params.MinSize(2) || slices < params.MinSize(3)
+        isValid = false;
+        issues{end+1} = sprintf('Volume too small (%dx%dx%d), minimum required: %dx%dx%d', ...
+            rows, cols, slices, params.MinSize(1), params.MinSize(2), params.MinSize(3));
+        recommendations{end+1} = 'Consider resampling or using different volume';
     end
-    
-    if slices > params.MaxSlices
-        sizeValid = false;
-        sizeMessages{end+1} = sprintf('Too many slices (%d > %d)', slices, params.MaxSlices);
+
+    if rows > params.MaxSize(1) || cols > params.MaxSize(2) || slices > params.MaxSize(3)
+        warnings{end+1} = sprintf('Volume very large (%dx%dx%d), may need downsampling', rows, cols, slices);
+        recommendations{end+1} = 'Consider downsampling for memory efficiency';
     end
-    
-    if rows < params.MinSize || cols < params.MinSize
-        sizeValid = false;
-        sizeMessages{end+1} = sprintf('In-plane size too small (%dx%d, min %d)', ...
-                                       rows, cols, params.MinSize);
+
+
+    % Check 3: Data type and range
+    dataType = class(volume);
+    if ~ismember(dataType, {'double', 'single', 'int16', 'uint16', 'int32', 'uint32'})
+        warnings{end+1} = sprintf('Unusual data type: %s', dataType);
+        recommendations{end+1} = 'Convert to float or int16 for ML processing';
     end
-    
-    if rows > params.MaxSize || cols > params.MaxSize
-        sizeValid = false;
-        sizeMessages{end+1} = sprintf('In-plane size too large (%dx%d, max %d)', ...
-                                       rows, cols, params.MaxSize);
+
+    % Check 4: Value range (typical for medical imaging)
+    minVal = double(min(volume(:)));
+    maxVal = double(max(volume(:)));
+
+    if minVal >= 0 && maxVal <= 255
+        warnings{end+1} = 'Values in [0,255] range - may be pre-windowed or normalized';
+        recommendations{end+1} = 'Verify if this is raw data or pre-processed';
+    elseif minVal < -2000 || maxVal > 4000
+        warnings{end+1} = sprintf('Unusual HU range: [%.1f, %.1f]', minVal, maxVal);
+        recommendations{end+1} = 'Check if values are in Hounsfield Units or properly scaled';
     end
-    
-    report.checks.sizeConstraints.passed = sizeValid;
-    report.checks.sizeConstraints.messages = sizeMessages;
-    
-    if ~sizeValid
-        report.passed = false;
-        report.failureReason = strjoin(sizeMessages, '; ');
-        if params.Verbose
-            fprintf('FAILED (%s)\n', report.failureReason);
-        end
+
+    % Check 5: Volume content and quality
+    volumeVariance = var(double(volume(:)));
+    if volumeVariance < 1
+        isValid = false;
+        issues{end+1} = 'Volume has very low variance - may be blank or corrupted';
+        recommendations{end+1} = 'Check data integrity and acquisition parameters';
+    end
+
+    % Check 6: Slice consistency (variance across slices)
+    sliceMeans = squeeze(mean(mean(volume, 1), 2));
+    sliceVariance = var(sliceMeans);
+    if sliceVariance < 0.1
+        warnings{end+1} = 'Very uniform slice intensities - may indicate processing artifacts';
+        recommendations{end+1} = 'Check for preprocessing that may have reduced inter-slice variation';
+    end
+
+    % Check 7: Memory requirements
+    volumeInfo = whos('volume');
+    totalBytes = volumeInfo.bytes;
+    totalGB = totalBytes / (1024^3);
+
+    if totalGB > params.MemoryLimitGB
+        warnings{end+1} = sprintf('High memory usage: %.2f GB (limit: %.1f GB)', totalGB, params.MemoryLimitGB);
+        recommendations{end+1} = 'Consider downsampling or processing in smaller chunks';
+    end
+
+    % Check 8: Aspect ratio and anisotropy (if voxel spacing info available)
+    % This would require DICOM metadata, but we can check basic aspect ratios
+    aspectRatioXY = rows / cols;
+    aspectRatioXZ = rows / slices;
+    aspectRatioYZ = cols / slices;
+
+    if aspectRatioXY > 5 || aspectRatioXY < 0.2
+        warnings{end+1} = sprintf('Extreme XY aspect ratio: %.2f', aspectRatioXY);
+        recommendations{end+1} = 'Consider resampling for more isotropic voxels';
+    end
+
+    if aspectRatioXZ > 10 || aspectRatioXZ < 0.1
+        warnings{end+1} = sprintf('Extreme XZ aspect ratio: %.2f', aspectRatioXZ);
+        recommendations{end+1} = 'Volume may need slice interpolation or resampling';
+    end
+
+    % Check 9: Data integrity (NaN/Inf values)
+    numNaN = sum(isnan(volume(:)));
+    numInf = sum(isinf(volume(:)));
+
+    if numNaN > 0
+        isValid = false;
+        issues{end+1} = sprintf('Volume contains %d NaN values', numNaN);
+        recommendations{end+1} = 'Replace or interpolate NaN values';
+    end
+
+    if numInf > 0
+        isValid = false;
+        issues{end+1} = sprintf('Volume contains %d Inf values', numInf);
+        recommendations{end+1} = 'Check for division by zero or invalid operations';
+    end
+
+    % Compile results
+    info = struct();
+    info.dimensions = [rows, cols, slices];
+    info.dataType = dataType;
+    info.valueRange = [minVal, maxVal];
+    info.variance = volumeVariance;
+    info.sliceVariance = sliceVariance;
+    info.memoryUsageGB = totalGB;
+    info.aspectRatios = [aspectRatioXY, aspectRatioXZ, aspectRatioYZ];
+    info.numNaN = numNaN;
+    info.numInf = numInf;
+    info.issues = issues;
+    info.warnings = warnings;
+    info.recommendations = recommendations;
+    info.isValid = isValid;
+
+    % Overall assessment
+    if isValid && isempty(warnings)
+        info.assessment = 'Volume is ready for ML workflows';
+    elseif isValid
+        info.assessment = 'Volume is valid but has minor concerns';
     else
-        if params.Verbose
-            fprintf('PASSED\n');
-        end
-    end
-    
-    % Check 3: Data quality (NaN/Inf)
-    if params.Verbose
-        fprintf('Checking data quality... ');
-    end
-    
-    hasNaN = any(isnan(volume(:)));
-    hasInf = any(isinf(volume(:)));
-    
-    dataQualityValid = true;
-    dataQualityMessages = {};
-    
-    if hasNaN && ~params.AllowNaN
-        dataQualityValid = false;
-        nanCount = sum(isnan(volume(:)));
-        dataQualityMessages{end+1} = sprintf('Contains %d NaN values', nanCount);
-    end
-    
-    if hasInf && ~params.AllowInf
-        dataQualityValid = false;
-        infCount = sum(isinf(volume(:)));
-        dataQualityMessages{end+1} = sprintf('Contains %d Inf values', infCount);
-    end
-    
-    report.checks.dataQuality.passed = dataQualityValid;
-    report.checks.dataQuality.hasNaN = hasNaN;
-    report.checks.dataQuality.hasInf = hasInf;
-    report.checks.dataQuality.messages = dataQualityMessages;
-    
-    if ~dataQualityValid
-        report.passed = false;
-        if isempty(report.failureReason)
-            report.failureReason = strjoin(dataQualityMessages, '; ');
-        else
-            report.failureReason = [report.failureReason '; ' strjoin(dataQualityMessages, '; ')];
-        end
-        if params.Verbose
-            fprintf('FAILED (%s)\n', strjoin(dataQualityMessages, '; '));
-        end
-    else
-        if params.Verbose
-            fprintf('PASSED\n');
-        end
-    end
-    
-    % Check 4: Value range
-    if params.Verbose
-        fprintf('Checking value range... ');
-    end
-    
-    minVal = min(volume(:));
-    maxVal = max(volume(:));
-    meanVal = mean(volume(:));
-    stdVal = std(double(volume(:)));
-    
-    report.checks.valueRange.min = minVal;
-    report.checks.valueRange.max = maxVal;
-    report.checks.valueRange.mean = meanVal;
-    report.checks.valueRange.std = stdVal;
-    report.checks.valueRange.passed = true;
-    
-    if params.Verbose
-        fprintf('PASSED (range: [%.2f, %.2f], mean: %.2f)\n', minVal, maxVal, meanVal);
-    end
-    
-    % Check 5: Empty slices
-    if params.Verbose
-        fprintf('Checking for empty slices... ');
-    end
-    
-    emptySlices = [];
-    for i = 1:slices
-        slice = volume(:, :, i);
-        if all(slice(:) == 0) || all(isnan(slice(:)))
-            emptySlices(end+1) = i;
-        end
-    end
-    
-    emptySlicesValid = isempty(emptySlices);
-    report.checks.emptySlices.passed = emptySlicesValid;
-    report.checks.emptySlices.count = length(emptySlices);
-    report.checks.emptySlices.indices = emptySlices;
-    
-    if ~emptySlicesValid
-        if params.Verbose
-            fprintf('WARNING (found %d empty slices)\n', length(emptySlices));
-        end
-        % This is a warning, not a failure
-    else
-        if params.Verbose
-            fprintf('PASSED\n');
-        end
-    end
-    
-    % Final validation result
-    isValid = report.passed;
-    
-    if params.Verbose
-        fprintf('======================\n');
-        if isValid
-            fprintf('✓ Volume validation PASSED\n');
-        else
-            fprintf('✗ Volume validation FAILED: %s\n', report.failureReason);
-        end
+        info.assessment = 'Volume has issues that need to be addressed';
     end
 end
