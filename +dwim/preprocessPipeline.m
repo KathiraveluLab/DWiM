@@ -67,17 +67,6 @@ function [output, metadata] = preprocessPipeline(input, config)
     metadata.timestamp = datetime('now');
     metadata.config = config;
     metadata.steps = struct();
-    
-%   [output, metadata] = preprocessPipeline(input, config)
-%       Applies configurable preprocessing pipeline to medical images/volumes
-%
-%   Inputs:
-%       input - Input data (file path, image array, or volume array)
-%       config - Configuration structure defining preprocessing steps
-%
-%   Outputs:
-%       output - Processed data (image/volume with same type as input)
-%       metadata - Processing metadata and results
 %
 %   Configuration Structure:
 %       config.inputType - 'filepath', 'image', 'volume', 'dicomdir'

@@ -97,7 +97,8 @@ function dicomFiles = findDicomFiles(dicomPath)
     % Also check files without extension (common in some systems)
     allFiles = dir(dicomPath);
     for i = 1:length(allFiles)
-        if ~allFiles(i).isdir && isempty(strfind(allFiles(i).name, '.'))
+        [~, ~, ext] = fileparts(allFiles(i).name);
+        if ~allFiles(i).isdir && isempty(ext)
             filepath = fullfile(allFiles(i).folder, allFiles(i).name);
             try
                 dicominfo(filepath);  % Test if it's a valid DICOM

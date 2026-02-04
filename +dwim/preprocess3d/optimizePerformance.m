@@ -37,18 +37,22 @@ function results = optimizePerformance(volume, varargin)
     parse(p, varargin{:});
     params = p.Results;
     
+    % Get actual memory size
+    volumeInfo = whos('volume');
+    memSizeMB = volumeInfo.bytes / 1024^2;
+    
     if params.Verbose
         fprintf('DWiM 3D Preprocessing Performance Analysis\n');
         fprintf('=========================================\n');
         fprintf('Volume size: [%d %d %d]\n', size(volume));
         fprintf('Data type: %s\n', class(volume));
-        fprintf('Memory size: %.1f MB\n', numel(volume) * 8 / 1024^2);
+        fprintf('Memory size: %.1f MB\n', memSizeMB);
     end
     
     results = struct();
     results.volumeSize = size(volume);
     results.dataType = class(volume);
-    results.memorySizeMB = numel(volume) * 8 / 1024^2;
+    results.memorySizeMB = memSizeMB;
     
     % Test 1: Baseline performance
     if params.Verbose
@@ -146,10 +150,14 @@ function results = optimizePerformance(volume, varargin)
         fprintf('\nMemory Usage Analysis:\n');
     end
     
-    inputMemory = prod(size(volume)) * 8 / 1024^3;  % GB
+    % Get actual element size from whos
+    volumeInfo = whos('volume');
+    elementBytes = volumeInfo.bytes / numel(volume);
+    
+    inputMemory = prod(size(volume)) * elementBytes / 1024^3;  % GB
     scaleFactor = 1 / params.TargetSpacing;  % Assuming 1mm original spacing
     outputSize = round(size(volume) * scaleFactor);
-    outputMemory = prod(outputSize) * 8 / 1024^3;  % GB
+    outputMemory = prod(outputSize) * elementBytes / 1024^3;  % GB (assume same type)
     totalMemory = inputMemory + outputMemory;
     
     results.memory.inputGB = inputMemory;

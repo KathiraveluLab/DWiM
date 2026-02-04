@@ -225,10 +225,9 @@ function T = calculateTransformMatrix(currentOrient, targetOrient, orientInfo)
     % Map axes and handle flips
     for i = 1:3
         targetAxis = targetAxes(i);
-        currentAxis = currentAxes(i);
         
-        % Find which current axis maps to this target axis
-        [~, axisIdx] = min(abs(currentAxes - abs(targetAxis)));
+        % Find which current axis maps to this target axis (exact match)
+        axisIdx = find(abs(currentAxes) == abs(targetAxis));
         
         % Set transformation element
         T(i, axisIdx) = sign(targetAxis) * sign(currentAxes(axisIdx));
