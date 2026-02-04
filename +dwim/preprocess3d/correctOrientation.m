@@ -146,6 +146,15 @@ function orientation = determineCurrentOrientation(orientInfo, verbose)
     rowDir = orientInfo.imageOrientation(1:3);
     colDir = orientInfo.imageOrientation(4:6);
     
+    % Check orthogonality (for oblique slices)
+    dotProduct = abs(dot(rowDir, colDir));
+    if dotProduct > 0.01  % Threshold for orthogonality
+        if verbose
+            warning('dwim:correctOrientation:ObliqueSlice', ...
+                'Row and column directions are not orthogonal (dot product = %.4f). Results may be incorrect for oblique acquisitions.', dotProduct);
+        end
+    end
+    
     % Calculate slice direction (cross product)
     sliceDir = cross(rowDir, colDir);
     
@@ -194,7 +203,7 @@ function axis = findPrimaryAxis(direction)
 end
 
 function T = calculateTransformMatrix(currentOrient, targetOrient, orientInfo)
-%CALCULATETRANSFORMMATRIX Calculate 4x4 transformation matrix
+%CALCULATETRANSFORMMATRIX Calculate 4x4 affine transformation matrix including translation
     
     if strcmp(currentOrient, targetOrient)
         T = eye(4);
@@ -219,8 +228,8 @@ function T = calculateTransformMatrix(currentOrient, targetOrient, orientInfo)
     currentAxes = orientMap(currentOrient);
     targetAxes = orientMap(targetOrient);
     
-    % Build transformation matrix
-    T = eye(4);
+    % Build rotation/reflection matrix
+    R = eye(4);
     
     % Map axes and handle flips
     for i = 1:3
@@ -230,8 +239,16 @@ function T = calculateTransformMatrix(currentOrient, targetOrient, orientInfo)
         axisIdx = find(abs(currentAxes) == abs(targetAxis));
         
         % Set transformation element
-        T(i, axisIdx) = sign(targetAxis) * sign(currentAxes(axisIdx));
+        R(i, axisIdx) = sign(targetAxis) * sign(currentAxes(axisIdx));
     end
+    
+    % Build translation component from ImagePositionPatient
+    % This ensures the volume stays at its anatomical location
+    translation = orientInfo.imagePosition;
+    
+    % Combine rotation and translation into full affine transform
+    T = R;
+    T(1:3, 4) = translation;
 end
 
 function correctedVolume = applyOrientationTransform(volume, T, method, verbose)

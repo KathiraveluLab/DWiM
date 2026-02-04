@@ -112,14 +112,14 @@ end
 
 function fileInfo = readAllMetadata(dicomFiles, verbose)
 %READALLMETADATA Read metadata from all DICOM files
-    fileInfo = struct('filename', {}, 'info', {}, 'sliceLocation', {}, 'instanceNumber', {});
+    numFiles = length(dicomFiles);
+    fileInfoCell = cell(1, numFiles);
     
     if verbose
-        fprintf('Reading metadata from %d files...\n', length(dicomFiles));
+        fprintf('Reading metadata from %d files...\n', numFiles);
     end
     
-    validFiles = 0;
-    for i = 1:length(dicomFiles)
+    for i = 1:numFiles
         try
             info = dicominfo(dicomFiles{i});
             
@@ -138,18 +138,19 @@ function fileInfo = readAllMetadata(dicomFiles, verbose)
                 instanceNumber = info.InstanceNumber;
             end
             
-            validFiles = validFiles + 1;
-            fileInfo(validFiles).filename = dicomFiles{i};
-            fileInfo(validFiles).info = info;
-            fileInfo(validFiles).sliceLocation = sliceLocation;
-            fileInfo(validFiles).instanceNumber = instanceNumber;
+            fileInfoCell{i} = struct('filename', dicomFiles{i}, 'info', info, 'sliceLocation', sliceLocation, 'instanceNumber', instanceNumber);
             
         catch ME
             if verbose
                 fprintf('Warning: Skipping invalid DICOM file: %s\n', dicomFiles{i});
             end
+            % fileInfoCell{i} will remain empty
         end
     end
+    
+    % Filter out failed reads and convert to struct array
+    fileInfo = [fileInfoCell{~cellfun('isempty', fileInfoCell)}];
+    validFiles = length(fileInfo);
     
     if verbose
         fprintf('Successfully read %d valid DICOM files\n', validFiles);

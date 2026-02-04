@@ -26,7 +26,7 @@
 
 #### Patient Coordinate System (DICOM Standard)
 - **X-axis**: Right (-) to Left (+)
-- **Y-axis**: Posterior (-) to Anterior (+)
+- **Y-axis**: Anterior (-) to Posterior (+)
 - **Z-axis**: Inferior (-) to Superior (+)
 
 #### Common Orientation Codes

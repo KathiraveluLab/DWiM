@@ -20,6 +20,10 @@ fprintf('\nExample 1: DICOM folder → ML-ready volume\n');
 % Path to DICOM series directory
 dicomPath = 'path/to/your/dicom/series/';
 
+if ~isfolder(dicomPath)
+    error('dwim:Example:PathNotFound', 'Example path not found. Please update the `dicomPath` variable to point to your DICOM data.');
+end
+
 try
     % Configure the unified pipeline
     config = struct();
