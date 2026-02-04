@@ -67,22 +67,6 @@ function [output, metadata] = preprocessPipeline(input, config)
     metadata.timestamp = datetime('now');
     metadata.config = config;
     metadata.steps = struct();
-%
-%   Configuration Structure:
-%       config.inputType - 'filepath', 'image', 'volume', 'dicomdir'
-%       config.outputType - 'image', 'volume', 'series'
-%       config.steps - Cell array of processing step names
-%       config.parameters - Struct with parameters for each step
-%       config.validation - Validation settings
-%       config.verbose - Display progress information
-%
-%   Example:
-%       config = struct();
-%       config.inputType = 'dicomdir';
-%       config.steps = {'assemble', 'orient', 'resample', 'validate'};
-%       config.parameters.targetOrientation = 'RAS';
-%       config.parameters.targetSpacing = 1.0;
-%
 %       [volume, metadata] = dwim.preprocessPipeline('dicom_folder/', config);
 
     % Input validation

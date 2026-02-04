@@ -40,14 +40,18 @@ try
 
     fprintf('✓ Successfully processed DICOM series!\n');
     fprintf('  Final dimensions: [%d %d %d]\n', size(volume));
-    fprintf('  Voxel spacing: [%.2f %.2f %.2f] mm\n', metadata.resample.targetSpacing);
-    fprintf('  Orientation: %s\n', metadata.orient.targetOrientation);
+    if isfield(metadata, 'resample') && isfield(metadata.resample, 'targetSpacing')
+        fprintf('  Voxel spacing: [%.2f %.2f %.2f] mm\n', metadata.resample.targetSpacing);
+    end
+    if isfield(metadata, 'orient') && isfield(metadata.orient, 'targetOrientation')
+        fprintf('  Orientation: %s\n', metadata.orient.targetOrientation);
+    end
     fprintf('  Total processing time: %.2f seconds\n', metadata.totalTime);
 
     % Display validation results
-    if metadata.validation.performed && metadata.validation.isValid
+    if isfield(metadata, 'validation') && metadata.validation.performed && metadata.validation.isValid
         fprintf('  Validation: PASSED\n');
-    elseif metadata.validation.performed
+    elseif isfield(metadata, 'validation') && metadata.validation.performed
         fprintf('  Validation: FAILED - check metadata.validation.results\n');
     end
 

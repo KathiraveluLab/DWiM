@@ -242,13 +242,10 @@ function T = calculateTransformMatrix(currentOrient, targetOrient, orientInfo)
         R(i, axisIdx) = sign(targetAxis) * sign(currentAxes(axisIdx));
     end
     
-    % Build translation component from ImagePositionPatient
-    % This ensures the volume stays at its anatomical location
-    translation = orientInfo.imagePosition;
-    
-    % Combine rotation and translation into full affine transform
+    % For pure reorientation within the volume, we only need the rotation/reflection matrix.
+    % Translation is not applied here as we're operating in voxel space, not patient space.
+    % The ImagePositionPatient is preserved in the metadata for downstream spatial alignment.
     T = R;
-    T(1:3, 4) = translation;
 end
 
 function correctedVolume = applyOrientationTransform(volume, T, method, verbose)

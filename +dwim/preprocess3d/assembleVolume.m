@@ -83,15 +83,18 @@ function dicomFiles = findDicomFiles(dicomPath)
         error('dwim:assembleVolume:InvalidPath', 'Directory does not exist: %s', dicomPath);
     end
     
-    % Common DICOM file extensions
+    % Common DICOM file extensions - collect all file structs first
     extensions = {'*.dcm', '*.dicom', '*.DCM', '*.DICOM'};
-    dicomFiles = {};
-    
+    allFilesStruct = [];
     for i = 1:length(extensions)
-        files = dir(fullfile(dicomPath, extensions{i}));
-        for j = 1:length(files)
-            dicomFiles{end+1} = fullfile(files(j).folder, files(j).name);
-        end
+        allFilesStruct = [allFilesStruct; dir(fullfile(dicomPath, extensions{i}))];
+    end
+    
+    % Construct paths vectorized
+    if ~isempty(allFilesStruct)
+        dicomFiles = fullfile({allFilesStruct.folder}, {allFilesStruct.name})';
+    else
+        dicomFiles = {};
     end
     
     % Also check files without extension (common in some systems)

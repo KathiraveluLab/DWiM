@@ -17,11 +17,8 @@ function test_integration()
         [resampled, resampleMeta] = dwim.preprocess3d.resampleVolume(volume, ...
             'VoxelSpacing', [1.0, 1.0, 2.0], 'TargetSpacing', 1.0, 'Verbose', false);
         
-        % Step 2: Apply 2D preprocessing to each slice
-        processed = zeros(size(resampled));
-        for slice = 1:size(resampled, 3)
-            processed(:,:,slice) = dwim.preprocess.normalizeHU(resampled(:,:,slice), 0, 1000);
-        end
+        % Step 2: Apply 2D preprocessing (vectorized on entire volume)
+        processed = dwim.preprocess.normalizeHU(resampled, 0, 1000);
         
         % Validate results
         assert(ndims(processed) == 3, 'Output should be 3D');

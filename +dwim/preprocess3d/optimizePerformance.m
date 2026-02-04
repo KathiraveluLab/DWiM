@@ -12,6 +12,7 @@ function results = optimizePerformance(volume, varargin)
 %
 %   Name-Value Arguments:
 %       TargetSpacing - Target spacing for testing (default: 1.0)
+%       VoxelSpacing - Current voxel spacing [x,y,z] in mm (default: [1.0, 1.0, 1.0])
 %       TestGPU - Test GPU performance if available (default: true)
 %       TestMethods - Test different interpolation methods (default: true)
 %       Verbose - Display detailed results (default: true)
@@ -21,7 +22,7 @@ function results = optimizePerformance(volume, varargin)
 %
 %   Example:
 %       volume = rand(128, 128, 64);
-%       results = dwim.preprocess3d.optimizePerformance(volume);
+%       results = dwim.preprocess3d.optimizePerformance(volume, 'VoxelSpacing', [0.5, 0.5, 1.0]);
 
     arguments
         volume {mustBeNumeric}
@@ -31,6 +32,7 @@ function results = optimizePerformance(volume, varargin)
     % Parse arguments
     p = inputParser;
     addParameter(p, 'TargetSpacing', 1.0, @(x) isnumeric(x) && x > 0);
+    addParameter(p, 'VoxelSpacing', [1.0, 1.0, 1.0], @(x) isnumeric(x) && (isscalar(x) || numel(x) == 3));
     addParameter(p, 'TestGPU', true, @islogical);
     addParameter(p, 'TestMethods', true, @islogical);
     addParameter(p, 'Verbose', true, @islogical);
@@ -154,9 +156,15 @@ function results = optimizePerformance(volume, varargin)
     volumeInfo = whos('volume');
     elementBytes = volumeInfo.bytes / numel(volume);
     
+    % Use actual VoxelSpacing for accurate scale factor calculation
+    voxelSpacing = params.VoxelSpacing;
+    if isscalar(voxelSpacing)
+        voxelSpacing = [voxelSpacing, voxelSpacing, voxelSpacing];
+    end
+    
     inputMemory = prod(size(volume)) * elementBytes / 1024^3;  % GB
-    scaleFactor = 1 / params.TargetSpacing;  % Assuming 1mm original spacing
-    outputSize = round(size(volume) * scaleFactor);
+    scaleFactors = voxelSpacing / params.TargetSpacing;  % Per-axis scale factors
+    outputSize = round(size(volume) .* scaleFactors);
     outputMemory = prod(outputSize) * elementBytes / 1024^3;  % GB (assume same type)
     totalMemory = inputMemory + outputMemory;
     
