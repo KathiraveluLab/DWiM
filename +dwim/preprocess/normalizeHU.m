@@ -1,23 +1,23 @@
 function normalized = normalizeHU(image, windowCenter, windowWidth)
-%NORMALIZEHU Normalize Hounsfield Unit (HU) values to [0,1] range
+%NORMALIZEHU Normalize CT image using Hounsfield Unit windowing.
 %
-%   normalized = normalizeHU(image, windowCenter, windowWidth)
-%       Applies window/level normalization to CT image data
+%   normalized = dwim.preprocess.normalizeHU(image, windowCenter, windowWidth)
+%       Applies CT windowing to normalize pixel intensities based on HU values.
 %
 %   Inputs:
-%       image - 2D or 3D numeric array with HU values
-%       windowCenter - Center of the window in HU (e.g., -600 for lung)
-%       windowWidth - Width of the window in HU (e.g., 1500 for lung)
+%       image        - CT image array (2D or 3D)
+%       windowCenter - Center of the intensity window (HU)
+%       windowWidth  - Width of the intensity window (HU)
 %
 %   Outputs:
-%       normalized - Image normalized to [0,1] range
+%       normalized   - Normalized image with values in range [0, 1]
 %
 %   Example:
-%       % Lung window normalization
-%       normalized = dwim.preprocess.normalizeHU(ctSlice, -600, 1500);
+%       % Lung window (center=-600, width=1500)
+%       lungImage = dwim.preprocess.normalizeHU(ctImage, -600, 1500);
 %
-%       % Soft tissue window
-%       normalized = dwim.preprocess.normalizeHU(ctSlice, 40, 400);
+%       % Brain window (center=40, width=80)
+%       brainImage = dwim.preprocess.normalizeHU(ctImage, 40, 80);
 
     arguments
         image {mustBeNumeric}
@@ -26,15 +26,13 @@ function normalized = normalizeHU(image, windowCenter, windowWidth)
     end
     
     % Calculate window bounds
-    windowMin = windowCenter - (windowWidth / 2);
-    windowMax = windowCenter + (windowWidth / 2);
-    
-    % Convert to double for precision
-    image = double(image);
+    minHU = windowCenter - (windowWidth / 2);
+    maxHU = windowCenter + (windowWidth / 2);
     
     % Apply windowing
-    normalized = (image - windowMin) / (windowMax - windowMin);
+    normalized = double(image);
+    normalized = (normalized - minHU) / (maxHU - minHU);
     
-    % Clip to [0,1] range
+    % Clip to [0, 1] range
     normalized = max(0, min(1, normalized));
 end

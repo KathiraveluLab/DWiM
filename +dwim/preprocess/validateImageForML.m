@@ -1,11 +1,11 @@
 function [isValid, report] = validateImageForML(image, varargin)
-%VALIDATEIMAGEFORML Validate 2D image for machine learning workflows
+%VALIDATEIMAGEFORML Validate DICOM image for ML preprocessing.
 %
-%   [isValid, report] = validateImageForML(image)
-%       Validates 2D image for ML readiness
+%   [isValid, report] = dwim.preprocess.validateImageForML(image)
+%       Validates if a DICOM image is suitable for ML preprocessing.
 %
-%   [isValid, report] = validateImageForML(image, 'MinSize', N)
-%       Validates with custom minimum dimension
+%   [isValid, report] = dwim.preprocess.validateImageForML(image, 'MinSize', 64)
+%       Validates with custom minimum size requirements.
 %
 %   Inputs:
 %       image - 2D numeric array

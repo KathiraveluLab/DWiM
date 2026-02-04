@@ -1,11 +1,14 @@
 function [resampled, metadata] = resampleVolume(volume, varargin)
 %RESAMPLEVOLUME Resample 3D medical volume to isotropic spacing
 %
-%   [resampled, metadata] = resampleVolume(volume)
+%   [resampled, metadata] = dwim.preprocess3d.resampleVolume(volume)
 %       Resamples volume to isotropic spacing using minimum current spacing
 %
-%   [resampled, metadata] = resampleVolume(volume, 'TargetSpacing', spacing)
+%   [resampled, metadata] = dwim.preprocess3d.resampleVolume(volume, 'TargetSpacing', spacing)
 %       Resamples to specified isotropic spacing in mm
+%
+%   [resampled, metadata] = dwim.preprocess3d.resampleVolume(volume, 'Method', method)
+%       Uses specified interpolation method ('linear', 'cubic', 'nearest')
 %
 %   Inputs:
 %       volume - 3D numeric array representing medical volume

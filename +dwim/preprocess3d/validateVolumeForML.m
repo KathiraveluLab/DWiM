@@ -1,11 +1,11 @@
 function [isValid, report] = validateVolumeForML(volume, varargin)
-%VALIDATEVOLUMEFORML Validate 3D volume for machine learning workflows
+%VALIDATEVOLUMEFORML Validate 3D medical volume for ML workflows
 %
-%   [isValid, report] = validateVolumeForML(volume)
-%       Validates 3D volume for ML readiness
+%   [isValid, report] = dwim.preprocess3d.validateVolumeForML(volume)
+%       Validates if a 3D medical volume is suitable for ML preprocessing
 %
-%   [isValid, report] = validateVolumeForML(volume, 'MinSlices', N)
-%       Validates with custom minimum slice count
+%   [isValid, report] = dwim.preprocess3d.validateVolumeForML(volume, 'MinSlices', 10)
+%       Validates with custom minimum slice requirements
 %
 %   Inputs:
 %       volume - 3D numeric array representing medical volume

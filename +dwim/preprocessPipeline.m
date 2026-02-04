@@ -1,8 +1,8 @@
 function [output, metadata] = preprocessPipeline(input, config)
-%PREPROCESSPIPELINE Unified preprocessing pipeline for DICOM to ML workflows
+%PREPROCESSPIPELINE Unified preprocessing pipeline for medical imaging
 %
-%   [output, metadata] = preprocessPipeline(input, config)
-%       Executes a configurable preprocessing pipeline
+%   [output, metadata] = dwim.preprocessPipeline(input, config)
+%       Applies configurable preprocessing pipeline to medical images/volumes
 %
 %   Inputs:
 %       input - Input data (filepath, directory path, or array)
