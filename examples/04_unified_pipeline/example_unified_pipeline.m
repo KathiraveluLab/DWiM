@@ -41,7 +41,7 @@ try
     fprintf('✓ Successfully processed DICOM series!\n');
     fprintf('  Final dimensions: [%d %d %d]\n', size(volume));
     if isfield(metadata, 'resample') && isfield(metadata.resample, 'targetSpacing')
-        fprintf('  Voxel spacing: [%.2f %.2f %.2f] mm\n', metadata.resample.targetSpacing);
+        fprintf('  Voxel spacing: %.2f mm (isotropic)\n', metadata.resample.targetSpacing);
     end
     if isfield(metadata, 'orient') && isfield(metadata.orient, 'targetOrientation')
         fprintf('  Orientation: %s\n', metadata.orient.targetOrientation);

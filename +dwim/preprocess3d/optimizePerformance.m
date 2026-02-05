@@ -233,20 +233,32 @@ function recommendations = generateRecommendations(results, params)
 %GENERATERECOMMENDATIONS Generate performance optimization recommendations
     recommendations = {};
     
+    % Constants for recommendation thresholds
+    CHUNKED_PROCESSING_THRESHOLD_GB = 8;
+    SINGLE_PRECISION_THRESHOLD_GB = 16;
+    GPU_RECOMMEND_SPEEDUP = 2.0;
+    GPU_OVERHEAD_THRESHOLD = 1.2;
+    CUBIC_LINEAR_SLOWER_THRESHOLD = 3.0;
+    CUBIC_LINEAR_MINIMAL_PENALTY = 1.5;
+    SUBOPTIMAL_PERFORMANCE_RATE_MVPS = 1.0;
+    EXCELLENT_PERFORMANCE_RATE_MVPS = 10.0;
+    LARGE_UPSAMPLING_RATIO = 100;
+    LARGE_DOWNSAMPLING_RATIO = 0.01;
+    
     % Memory recommendations
-    if results.memory.peakGB > 8
-        recommendations{end+1} = 'Consider using chunked processing for large volumes (>8GB peak memory)';
+    if results.memory.peakGB > CHUNKED_PROCESSING_THRESHOLD_GB
+        recommendations{end+1} = sprintf('Consider using chunked processing for large volumes (>%dGB peak memory)', CHUNKED_PROCESSING_THRESHOLD_GB);
     end
     
-    if results.memory.peakGB > 16
+    if results.memory.peakGB > SINGLE_PRECISION_THRESHOLD_GB
         recommendations{end+1} = 'Use single precision data type to reduce memory usage by 50%';
     end
     
     % GPU recommendations
     if isfield(results, 'gpu') && results.gpu.available
-        if results.gpu.speedup > 2
+        if results.gpu.speedup > GPU_RECOMMEND_SPEEDUP
             recommendations{end+1} = sprintf('GPU provides %.1fx speedup - recommended for this volume size', results.gpu.speedup);
-        elseif results.gpu.speedup < 1.2
+        elseif results.gpu.speedup < GPU_OVERHEAD_THRESHOLD
             recommendations{end+1} = 'GPU overhead exceeds benefits for this volume size - use CPU';
         end
     elseif params.TestGPU
@@ -256,9 +268,9 @@ function recommendations = generateRecommendations(results, params)
     % Method recommendations
     if isfield(results, 'methods')
         if isfield(results.methods, 'linear') && isfield(results.methods, 'cubic')
-            if results.methods.cubic.time / results.methods.linear.time > 3
+            if results.methods.cubic.time / results.methods.linear.time > CUBIC_LINEAR_SLOWER_THRESHOLD
                 recommendations{end+1} = 'Linear interpolation recommended for speed (cubic is 3x slower)';
-            elseif results.methods.cubic.time / results.methods.linear.time < 1.5
+            elseif results.methods.cubic.time / results.methods.linear.time < CUBIC_LINEAR_MINIMAL_PENALTY
                 recommendations{end+1} = 'Cubic interpolation provides better quality with minimal speed penalty';
             end
         end
@@ -269,9 +281,9 @@ function recommendations = generateRecommendations(results, params)
     end
     
     % Performance recommendations
-    if results.baseline.rate < 1.0  % Less than 1 MVoxel/sec
+    if results.baseline.rate < SUBOPTIMAL_PERFORMANCE_RATE_MVPS
         recommendations{end+1} = 'Performance is below optimal - consider smaller target spacing or GPU acceleration';
-    elseif results.baseline.rate > 10.0  % More than 10 MVoxel/sec
+    elseif results.baseline.rate > EXCELLENT_PERFORMANCE_RATE_MVPS
         recommendations{end+1} = 'Excellent performance - current settings are well-optimized';
     end
     
@@ -282,9 +294,9 @@ function recommendations = generateRecommendations(results, params)
             field = scalingFields{i};
             if isfield(results.scaling.(field), 'volumeRatio')
                 ratio = results.scaling.(field).volumeRatio;
-                if ratio > 100
+                if ratio > LARGE_UPSAMPLING_RATIO
                     recommendations{end+1} = 'Very large upsampling detected - verify target spacing is appropriate';
-                elseif ratio < 0.01
+                elseif ratio < LARGE_DOWNSAMPLING_RATIO
                     recommendations{end+1} = 'Very large downsampling detected - may lose important details';
                 end
             end

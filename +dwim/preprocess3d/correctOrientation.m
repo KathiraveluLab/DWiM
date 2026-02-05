@@ -5,6 +5,12 @@ function [correctedVolume, transformMatrix] = correctOrientation(volume, dicomIn
 %       Corrects volume orientation to standard anatomical position using
 %       DICOM orientation tags from the first slice
 %
+% Constants for thresholds
+persistent ORTHOGONALITY_THRESHOLD;
+if isempty(ORTHOGONALITY_THRESHOLD)
+    ORTHOGONALITY_THRESHOLD = 0.01;  % Threshold for row/col orthogonality check
+end
+%
 %   [correctedVolume, transformMatrix] = correctOrientation(volume, dicomInfoArray)
 %       Uses array of DICOM info structures for more robust orientation detection
 %
@@ -147,8 +153,9 @@ function orientation = determineCurrentOrientation(orientInfo, verbose)
     colDir = orientInfo.imageOrientation(4:6);
     
     % Check orthogonality (for oblique slices)
+    ORTHOGONALITY_THRESHOLD = 0.01;  % Configurable threshold
     dotProduct = abs(dot(rowDir, colDir));
-    if dotProduct > 0.01  % Threshold for orthogonality
+    if dotProduct > ORTHOGONALITY_THRESHOLD
         if verbose
             warning('dwim:correctOrientation:ObliqueSlice', ...
                 'Row and column directions are not orthogonal (dot product = %.4f). Results may be incorrect for oblique acquisitions.', dotProduct);
@@ -219,10 +226,13 @@ function T = calculateTransformMatrix(currentOrient, targetOrient, orientInfo)
     orientMap('LPI') = [-1, -2, -3]; % Left, Posterior, Inferior
     
     % Get axis mappings
-    if ~isKey(orientMap, currentOrient) || ~isKey(orientMap, targetOrient)
-        warning('Unsupported orientation, using identity transform');
-        T = eye(4);
-        return;
+    if ~isKey(orientMap, currentOrient)
+        error('dwim:correctOrientation:UnsupportedOrientation', ...
+              'Unsupported current orientation: %s. Supported: RAS, LPS, LAS, RPI, LPI', currentOrient);
+    end
+    if ~isKey(orientMap, targetOrient)
+        error('dwim:correctOrientation:UnsupportedOrientation', ...
+              'Unsupported target orientation: %s. Supported: RAS, LPS, LAS, RPI, LPI', targetOrient);
     end
     
     currentAxes = orientMap(currentOrient);

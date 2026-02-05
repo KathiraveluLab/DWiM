@@ -34,9 +34,16 @@ function [volume, metadata] = assembleVolume(dicomPath, varargin)
     addParameter(p, 'SortBy', 'SliceLocation', @(x) ismember(x, {'SliceLocation', 'InstanceNumber'}));
     addParameter(p, 'ValidateSpacing', true, @islogical);
     addParameter(p, 'FillGaps', false, @islogical);
+    addParameter(p, 'AllowResizing', true, @islogical);  % Whether to auto-resize mismatched slices
     addParameter(p, 'Verbose', true, @islogical);
     parse(p, varargin{:});
     params = p.Results;
+    
+    % Define constants for thresholds
+    INCONSISTENT_SPACING_THRESHOLD = 0.1;      % 10% variation triggers warning
+    MISSING_SLICE_GAP_FACTOR = 2;              % Gap > 2x mean indicates missing slice
+    MIN_REALISTIC_THICKNESS = 0.01;            % mm
+    MAX_REALISTIC_THICKNESS = 50;              % mm
     
     if params.Verbose
         fprintf('DWiM Volume Assembly\n');
@@ -136,9 +143,14 @@ function fileInfo = readAllMetadata(dicomFiles, verbose)
             end
             
             % Extract instance number
-            instanceNumber = i;  % Default fallback
             if isfield(info, 'InstanceNumber')
                 instanceNumber = info.InstanceNumber;
+            else
+                instanceNumber = i;  % Default fallback - may not reflect true order
+                if verbose
+                    warning('dwim:assembleVolume:NoInstanceNumber', ...
+                            'InstanceNumber missing for file %d. Using file index as fallback.', i);
+                end
             end
             
             fileInfoCell{i} = struct('filename', dicomFiles{i}, 'info', info, 'sliceLocation', sliceLocation, 'instanceNumber', instanceNumber);
@@ -202,15 +214,19 @@ function validateSliceSpacing(sortedInfo, verbose)
         fprintf('  Std spacing: %.3f mm\n', std(spacings));
     end
     
+    % Constants for validation thresholds
+    INCONSISTENT_SPACING_THRESHOLD = 0.1;  % 10% variation
+    MISSING_SLICE_GAP_FACTOR = 2;          % 2x mean spacing
+    
     % Check for large variations in spacing
-    if std(spacings) > 0.1 * abs(mean(spacings))
+    if std(spacings) > INCONSISTENT_SPACING_THRESHOLD * abs(mean(spacings))
         warning('dwim:assembleVolume:InconsistentSpacing', ...
                 'Inconsistent slice spacing detected (std=%.3f)', std(spacings));
     end
     
-    % Check for missing slices (gaps larger than 2x mean spacing)
+    % Check for missing slices (gaps larger than threshold)
     meanSpacing = mean(spacings);
-    largeGaps = find(abs(spacings) > 2 * abs(meanSpacing));
+    largeGaps = find(abs(spacings) > MISSING_SLICE_GAP_FACTOR * abs(meanSpacing));
     if ~isempty(largeGaps)
         warning('dwim:assembleVolume:MissingSlices', ...
                 'Potential missing slices detected at %d locations', length(largeGaps));
@@ -284,7 +300,9 @@ function metadata = generateAssemblyMetadata(sortedInfo, assemblyInfo, params)
         sliceThickness = abs(median(spacings));
         
         % Fallback if median is zero or unrealistic
-        if sliceThickness < 0.01 || sliceThickness > 50
+        MIN_REALISTIC_THICKNESS = 0.01;  % mm
+        MAX_REALISTIC_THICKNESS = 50;    % mm
+        if sliceThickness < MIN_REALISTIC_THICKNESS || sliceThickness > MAX_REALISTIC_THICKNESS
             sliceThickness = abs(mean(spacings(spacings ~= 0)));
             if isnan(sliceThickness) || sliceThickness < 0.01
                 sliceThickness = 1.0;  % Default fallback
