@@ -5,12 +5,6 @@ function [correctedVolume, transformMatrix] = correctOrientation(volume, dicomIn
 %       Corrects volume orientation to standard anatomical position using
 %       DICOM orientation tags from the first slice
 %
-% Constants for thresholds
-persistent ORTHOGONALITY_THRESHOLD;
-if isempty(ORTHOGONALITY_THRESHOLD)
-    ORTHOGONALITY_THRESHOLD = 0.01;  % Threshold for row/col orthogonality check
-end
-%
 %   [correctedVolume, transformMatrix] = correctOrientation(volume, dicomInfoArray)
 %       Uses array of DICOM info structures for more robust orientation detection
 %
