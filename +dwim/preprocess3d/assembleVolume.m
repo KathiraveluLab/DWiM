@@ -157,6 +157,10 @@ function fileInfo = readAllMetadata(dicomFiles, verbose)
             fileInfoCell{i} = struct('filename', dicomFiles{i}, 'info', info, 'sliceLocation', sliceLocation, 'instanceNumber', instanceNumber);
             
         catch ME
+            if verbose
+                warning('dwim:assembleVolume:MetadataReadError', ...
+                        'Could not read metadata from %s: %s', dicomFiles{i}, ME.message);
+            end
             % fileInfoCell{i} will remain empty
         end
     end

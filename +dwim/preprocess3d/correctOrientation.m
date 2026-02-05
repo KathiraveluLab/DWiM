@@ -211,26 +211,11 @@ function T = calculateTransformMatrix(currentOrient, targetOrient, orientInfo)
         return;
     end
     
-    % Define axis mappings for common orientations
-    orientMap = containers.Map();
-    orientMap('RAS') = [1, 2, 3];   % Right, Anterior, Superior
-    orientMap('LPS') = [-1, -2, 3]; % Left, Posterior, Superior  
-    orientMap('LAS') = [-1, 2, 3];  % Left, Anterior, Superior
-    orientMap('RPI') = [1, -2, -3]; % Right, Posterior, Inferior
-    orientMap('LPI') = [-1, -2, -3]; % Left, Posterior, Inferior
-    
-    % Get axis mappings
-    if ~isKey(orientMap, currentOrient)
-        error('dwim:correctOrientation:UnsupportedOrientation', ...
-              'Unsupported current orientation: %s. Supported: RAS, LPS, LAS, RPI, LPI', currentOrient);
-    end
-    if ~isKey(orientMap, targetOrient)
-        error('dwim:correctOrientation:UnsupportedOrientation', ...
-              'Unsupported target orientation: %s. Supported: RAS, LPS, LAS, RPI, LPI', targetOrient);
-    end
-    
-    currentAxes = orientMap(currentOrient);
-    targetAxes = orientMap(targetOrient);
+    % Parse orientation codes to axis mappings
+    % Each orientation is 3 letters representing the direction along each axis:
+    % R/L (Right/Left), A/P (Anterior/Posterior), S/I (Superior/Inferior)
+    currentAxes = parseOrientationCode(currentOrient);
+    targetAxes = parseOrientationCode(targetOrient);
     
     % Build rotation/reflection matrix
     R = eye(4);
@@ -282,5 +267,55 @@ function correctedVolume = applyOrientationTransform(volume, T, method, verbose)
     
     if verbose
         fprintf('Transformation applied using %s interpolation\n', method);
+    end
+end
+
+function axes = parseOrientationCode(orient)
+%PARSEORIENTATIONCODE Parse 3-letter orientation code to axis mapping
+%   Returns [ax1, ax2, ax3] where:
+%   - Positive value = axis direction matches standard (R, A, S)
+%   - Negative value = axis direction is flipped (L, P, I)
+%   - Absolute value = which anatomical axis (1=LR, 2=AP, 3=SI)
+
+    if length(orient) ~= 3
+        error('dwim:correctOrientation:InvalidOrientation', ...
+              'Orientation code must be exactly 3 letters, got: %s', orient);
+    end
+    
+    axes = zeros(1, 3);
+    usedAxes = false(1, 3);
+    
+    for i = 1:3
+        letter = orient(i);
+        switch upper(letter)
+            case 'R'
+                axes(i) = 1;   % Right (positive X)
+                axisIdx = 1;
+            case 'L'
+                axes(i) = -1;  % Left (negative X)
+                axisIdx = 1;
+            case 'A'
+                axes(i) = 2;   % Anterior (positive Y)
+                axisIdx = 2;
+            case 'P'
+                axes(i) = -2;  % Posterior (negative Y)
+                axisIdx = 2;
+            case 'S'
+                axes(i) = 3;   % Superior (positive Z)
+                axisIdx = 3;
+            case 'I'
+                axes(i) = -3;  % Inferior (negative Z)
+                axisIdx = 3;
+            otherwise
+                error('dwim:correctOrientation:InvalidOrientation', ...
+                      'Invalid orientation letter: %s. Valid letters: R, L, A, P, S, I', letter);
+        end
+        
+        % Check for duplicate axes (e.g., "RRS" is invalid)
+        if usedAxes(axisIdx)
+            error('dwim:correctOrientation:InvalidOrientation', ...
+                  'Orientation code has duplicate axis: %s', orient);
+        end
+        usedAxes(axisIdx) = true;
     end
 end

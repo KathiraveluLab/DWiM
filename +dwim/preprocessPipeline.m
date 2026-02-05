@@ -38,7 +38,7 @@ function [output, metadata] = preprocessPipeline(input, config)
 
     arguments
         input
-        config struct
+        config (1,1) struct
     end
     
     % Validate config
@@ -62,20 +62,12 @@ function [output, metadata] = preprocessPipeline(input, config)
         config.verbose = true;
     end
     
-    % Initialize metadata
-    metadata = struct();
-    metadata.timestamp = datetime('now');
-    metadata.config = config;
-    metadata.steps = struct();
-
-    % Initialize timing and logging
+    % Initialize metadata and timing
     pipelineTimer = tic;
+    metadata = struct();
     metadata.startTime = datetime('now');
+    metadata.config = config;
     metadata.steps = {};
-
-    if ~isfield(config, 'verbose') || isempty(config.verbose)
-        config.verbose = true;
-    end
 
     if config.verbose
         fprintf('DWiM Unified Preprocessing Pipeline\n');
