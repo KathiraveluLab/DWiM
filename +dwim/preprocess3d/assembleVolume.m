@@ -142,8 +142,8 @@ function fileInfo = readAllMetadata(dicomFiles, verbose)
         try
             info = dicominfo(dicomFiles{i});
             
-            % Extract slice location
-            sliceLocation = 0;
+            % Extract slice location (use NaN for missing to avoid ambiguity)
+            sliceLocation = NaN;
             if isfield(info, 'SliceLocation')
                 sliceLocation = info.SliceLocation;
             elseif isfield(info, 'ImagePositionPatient')
@@ -221,18 +221,18 @@ function validateSliceSpacing(sortedInfo, verbose, INCONSISTENT_SPACING_THRESHOL
     
     if verbose
         fprintf('Slice spacing validation:\n');
-        fprintf('  Mean spacing: %.3f mm\n', mean(spacings));
-        fprintf('  Std spacing: %.3f mm\n', std(spacings));
+        fprintf('  Mean spacing: %.3f mm\n', mean(spacings, 'omitnan'));
+        fprintf('  Std spacing: %.3f mm\n', std(spacings, 'omitnan'));
     end
     
     % Check for large variations in spacing
-    if std(spacings) > INCONSISTENT_SPACING_THRESHOLD * abs(mean(spacings))
+    if std(spacings, 'omitnan') > INCONSISTENT_SPACING_THRESHOLD * abs(mean(spacings, 'omitnan'))
         warning('dwim:assembleVolume:InconsistentSpacing', ...
-                'Inconsistent slice spacing detected (std=%.3f)', std(spacings));
+                'Inconsistent slice spacing detected (std=%.3f)', std(spacings, 'omitnan'));
     end
     
     % Check for missing slices (gaps larger than threshold)
-    meanSpacing = mean(spacings);
+    meanSpacing = mean(spacings, 'omitnan');
     largeGaps = find(abs(spacings) > MISSING_SLICE_GAP_FACTOR * abs(meanSpacing));
     if ~isempty(largeGaps)
         warning('dwim:assembleVolume:MissingSlices', ...
@@ -332,11 +332,11 @@ function metadata = generateAssemblyMetadata(sortedInfo, assemblyInfo, params, M
         spacings = diff(locations);
         
         % Use median for robustness against outliers
-        sliceThickness = abs(median(spacings));
+        sliceThickness = abs(median(spacings, 'omitnan'));
         
         % Fallback if median is zero or unrealistic
         if sliceThickness < MIN_REALISTIC_THICKNESS || sliceThickness > MAX_REALISTIC_THICKNESS
-            sliceThickness = abs(mean(spacings(spacings ~= 0)));
+            sliceThickness = abs(mean(spacings(spacings ~= 0), 'omitnan'));
             if isnan(sliceThickness) || sliceThickness < 0.01
                 sliceThickness = 1.0;  % Default fallback
             end
