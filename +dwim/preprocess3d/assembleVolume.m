@@ -69,14 +69,14 @@ function [volume, metadata] = assembleVolume(dicomPath, varargin)
     
     % Validate spacing if requested
     if params.ValidateSpacing
-        validateSliceSpacing(sortedInfo, params.Verbose);
+        validateSliceSpacing(sortedInfo, params.Verbose, INCONSISTENT_SPACING_THRESHOLD, MISSING_SLICE_GAP_FACTOR);
     end
     
     % Assemble volume
     [volume, assemblyInfo] = assembleVolumeData(sortedInfo, params);
     
     % Generate metadata
-    metadata = generateAssemblyMetadata(sortedInfo, assemblyInfo, params);
+    metadata = generateAssemblyMetadata(sortedInfo, assemblyInfo, params, MIN_REALISTIC_THICKNESS, MAX_REALISTIC_THICKNESS);
     
     if params.Verbose
         fprintf('Volume assembly completed: [%d %d %d]\n', size(volume));
@@ -106,17 +106,21 @@ function dicomFiles = findDicomFiles(dicomPath)
     
     % Also check files without extension (common in some systems)
     allFiles = dir(dicomPath);
+    extlessPaths = {};
     for i = 1:length(allFiles)
         [~, ~, ext] = fileparts(allFiles(i).name);
         if ~allFiles(i).isdir && isempty(ext)
             filepath = fullfile(allFiles(i).folder, allFiles(i).name);
             try
                 dicominfo(filepath);  % Test if it's a valid DICOM
-                dicomFiles{end+1} = filepath;
+                extlessPaths{end+1} = filepath; %#ok<AGROW>
             catch
                 % Not a DICOM file, skip
             end
         end
+    end
+    if ~isempty(extlessPaths)
+        dicomFiles = [dicomFiles; extlessPaths'];
     end
 end
 
@@ -199,7 +203,7 @@ function sortedInfo = sortSlices(fileInfo, sortBy, verbose)
     end
 end
 
-function validateSliceSpacing(sortedInfo, verbose)
+function validateSliceSpacing(sortedInfo, verbose, INCONSISTENT_SPACING_THRESHOLD, MISSING_SLICE_GAP_FACTOR)
 %VALIDATESLICESPACING Check for consistent slice spacing
     if length(sortedInfo) < 2
         return;
@@ -213,10 +217,6 @@ function validateSliceSpacing(sortedInfo, verbose)
         fprintf('  Mean spacing: %.3f mm\n', mean(spacings));
         fprintf('  Std spacing: %.3f mm\n', std(spacings));
     end
-    
-    % Constants for validation thresholds
-    INCONSISTENT_SPACING_THRESHOLD = 0.1;  % 10% variation
-    MISSING_SLICE_GAP_FACTOR = 2;          % 2x mean spacing
     
     % Check for large variations in spacing
     if std(spacings) > INCONSISTENT_SPACING_THRESHOLD * abs(mean(spacings))
@@ -274,7 +274,7 @@ function [volume, assemblyInfo] = assembleVolumeData(sortedInfo, params)
     assemblyInfo.dataType = class(volume);
 end
 
-function metadata = generateAssemblyMetadata(sortedInfo, assemblyInfo, params)
+function metadata = generateAssemblyMetadata(sortedInfo, assemblyInfo, params, MIN_REALISTIC_THICKNESS, MAX_REALISTIC_THICKNESS)
 %GENERATEASSEMBLYMETADATA Create comprehensive assembly metadata
     metadata = struct();
     metadata.numFiles = length(sortedInfo);
@@ -300,8 +300,6 @@ function metadata = generateAssemblyMetadata(sortedInfo, assemblyInfo, params)
         sliceThickness = abs(median(spacings));
         
         % Fallback if median is zero or unrealistic
-        MIN_REALISTIC_THICKNESS = 0.01;  % mm
-        MAX_REALISTIC_THICKNESS = 50;    % mm
         if sliceThickness < MIN_REALISTIC_THICKNESS || sliceThickness > MAX_REALISTIC_THICKNESS
             sliceThickness = abs(mean(spacings(spacings ~= 0)));
             if isnan(sliceThickness) || sliceThickness < 0.01

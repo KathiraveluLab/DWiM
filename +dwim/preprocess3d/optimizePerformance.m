@@ -247,44 +247,44 @@ function recommendations = generateRecommendations(results, params)
     
     % Memory recommendations
     if results.memory.peakGB > CHUNKED_PROCESSING_THRESHOLD_GB
-        recommendations{end+1} = sprintf('Consider using chunked processing for large volumes (>%dGB peak memory)', CHUNKED_PROCESSING_THRESHOLD_GB);
+        recommendations = [recommendations, {sprintf('Consider using chunked processing for large volumes (>%dGB peak memory)', CHUNKED_PROCESSING_THRESHOLD_GB)}];
     end
     
     if results.memory.peakGB > SINGLE_PRECISION_THRESHOLD_GB
-        recommendations{end+1} = 'Use single precision data type to reduce memory usage by 50%';
+        recommendations = [recommendations, {'Use single precision data type to reduce memory usage by 50%'}];
     end
     
     % GPU recommendations
     if isfield(results, 'gpu') && results.gpu.available
         if results.gpu.speedup > GPU_RECOMMEND_SPEEDUP
-            recommendations{end+1} = sprintf('GPU provides %.1fx speedup - recommended for this volume size', results.gpu.speedup);
+            recommendations = [recommendations, {sprintf('GPU provides %.1fx speedup - recommended for this volume size', results.gpu.speedup)}];
         elseif results.gpu.speedup < GPU_OVERHEAD_THRESHOLD
-            recommendations{end+1} = 'GPU overhead exceeds benefits for this volume size - use CPU';
+            recommendations = [recommendations, {'GPU overhead exceeds benefits for this volume size - use CPU'}];
         end
     elseif params.TestGPU
-        recommendations{end+1} = 'Consider GPU acceleration for larger volumes if available';
+        recommendations = [recommendations, {'Consider GPU acceleration for larger volumes if available'}];
     end
     
     % Method recommendations
     if isfield(results, 'methods')
         if isfield(results.methods, 'linear') && isfield(results.methods, 'cubic')
             if results.methods.cubic.time / results.methods.linear.time > CUBIC_LINEAR_SLOWER_THRESHOLD
-                recommendations{end+1} = 'Linear interpolation recommended for speed (cubic is 3x slower)';
+                recommendations = [recommendations, {'Linear interpolation recommended for speed (cubic is 3x slower)'}];
             elseif results.methods.cubic.time / results.methods.linear.time < CUBIC_LINEAR_MINIMAL_PENALTY
-                recommendations{end+1} = 'Cubic interpolation provides better quality with minimal speed penalty';
+                recommendations = [recommendations, {'Cubic interpolation provides better quality with minimal speed penalty'}];
             end
         end
         
         if isfield(results.methods, 'nearest')
-            recommendations{end+1} = 'Use nearest neighbor interpolation for segmentation masks';
+            recommendations = [recommendations, {'Use nearest neighbor interpolation for segmentation masks'}];
         end
     end
     
     % Performance recommendations
     if results.baseline.rate < SUBOPTIMAL_PERFORMANCE_RATE_MVPS
-        recommendations{end+1} = 'Performance is below optimal - consider smaller target spacing or GPU acceleration';
+        recommendations = [recommendations, {'Performance is below optimal - consider smaller target spacing or GPU acceleration'}];
     elseif results.baseline.rate > EXCELLENT_PERFORMANCE_RATE_MVPS
-        recommendations{end+1} = 'Excellent performance - current settings are well-optimized';
+        recommendations = [recommendations, {'Excellent performance - current settings are well-optimized'}];
     end
     
     % Scaling recommendations
@@ -295,15 +295,15 @@ function recommendations = generateRecommendations(results, params)
             if isfield(results.scaling.(field), 'volumeRatio')
                 ratio = results.scaling.(field).volumeRatio;
                 if ratio > LARGE_UPSAMPLING_RATIO
-                    recommendations{end+1} = 'Very large upsampling detected - verify target spacing is appropriate';
+                    recommendations = [recommendations, {'Very large upsampling detected - verify target spacing is appropriate'}];
                 elseif ratio < LARGE_DOWNSAMPLING_RATIO
-                    recommendations{end+1} = 'Very large downsampling detected - may lose important details';
+                    recommendations = [recommendations, {'Very large downsampling detected - may lose important details'}];
                 end
             end
         end
     end
     
     if isempty(recommendations)
-        recommendations{1} = 'Current configuration appears optimal for this volume';
+        recommendations = {'Current configuration appears optimal for this volume'};
     end
 end
