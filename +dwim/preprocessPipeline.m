@@ -68,16 +68,8 @@ function [output, metadata] = preprocessPipeline(input, config)
     metadata.config = config;
     metadata.steps = struct();
 
-    % Input validation
-    arguments
-        input
-        config (1,1) struct
-    end
-
     % Initialize timing and logging
     pipelineTimer = tic;
-    metadata = struct();
-    metadata.config = config;
     metadata.startTime = datetime('now');
     metadata.steps = {};
 

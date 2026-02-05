@@ -44,7 +44,7 @@ function [correctedVolume, transformMatrix] = correctOrientation(volume, dicomIn
     
     % Parse arguments
     p = inputParser;
-    addParameter(p, 'TargetOrientation', 'RAS', @(x) ismember(x, {'RAS', 'LPS', 'LAS'}));
+    addParameter(p, 'TargetOrientation', 'RAS', @(x) ismember(x, {'RAS', 'LPS', 'LAS', 'RPI', 'LPI'}));
     addParameter(p, 'Method', 'linear', @(x) ismember(x, {'linear', 'cubic', 'nearest'}));
     addParameter(p, 'Verbose', true, @islogical);
     parse(p, varargin{:});

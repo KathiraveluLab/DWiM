@@ -92,10 +92,11 @@ function dicomFiles = findDicomFiles(dicomPath)
     
     % Common DICOM file extensions - collect all file structs first
     extensions = {'*.dcm', '*.dicom', '*.DCM', '*.DICOM'};
-    allFilesStruct = [];
+    allFilesStructs = cell(1, length(extensions));
     for i = 1:length(extensions)
-        allFilesStruct = [allFilesStruct; dir(fullfile(dicomPath, extensions{i}))];
+        allFilesStructs{i} = dir(fullfile(dicomPath, extensions{i}));
     end
+    allFilesStruct = vertcat(allFilesStructs{:});
     
     % Construct paths vectorized
     if ~isempty(allFilesStruct)
@@ -254,9 +255,15 @@ function [volume, assemblyInfo] = assembleVolumeData(sortedInfo, params)
             
             % Validate slice dimensions
             if ~isequal(size(slice), [rows, cols])
-                warning('dwim:assembleVolume:DimensionMismatch', ...
-                        'Slice %d has different dimensions, resizing', i);
-                slice = imresize(slice, [rows, cols]);
+                if params.AllowResizing
+                    warning('dwim:assembleVolume:DimensionMismatch', ...
+                            'Slice %d has different dimensions, resizing', i);
+                    slice = imresize(slice, [rows, cols]);
+                else
+                    error('dwim:assembleVolume:DimensionMismatch', ...
+                          'Slice %d has different dimensions [%d %d], expected [%d %d]. Set ''AllowResizing'' to true to handle this automatically.', ...
+                          i, size(slice, 1), size(slice, 2), rows, cols);
+                end
             end
             
             volume(:, :, i) = slice;
