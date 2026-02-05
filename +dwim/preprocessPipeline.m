@@ -67,7 +67,6 @@ function [output, metadata] = preprocessPipeline(input, config)
     metadata.timestamp = datetime('now');
     metadata.config = config;
     metadata.steps = struct();
-%       [volume, metadata] = dwim.preprocessPipeline('dicom_folder/', config);
 
     % Input validation
     arguments

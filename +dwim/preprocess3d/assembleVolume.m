@@ -112,12 +112,9 @@ function dicomFiles = findDicomFiles(dicomPath)
         [~, ~, ext] = fileparts(allFiles(i).name);
         if ~allFiles(i).isdir && isempty(ext)
             filepath = fullfile(allFiles(i).folder, allFiles(i).name);
-            try
-                dicominfo(filepath);  % Test if it's a valid DICOM
+            if isdicom(filepath)  % Fast header check for DICOM
                 numExtless = numExtless + 1;
                 extlessPaths{numExtless} = filepath;
-            catch
-                % Not a DICOM file, skip
             end
         end
     end
