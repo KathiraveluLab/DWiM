@@ -268,27 +268,17 @@ function correctedVolume = applyOrientationTransform(volume, T, method, verbose)
         return;
     end
     
-    [rows, cols, slices] = size(volume);
+    % Use imwarp for memory-efficient transformation.
+    % The transformation matrix T from calculateTransformMatrix is a forward
+    % transform for voxel coordinates. affine3d requires the transpose of
+    % the transformation matrix.
+    tform = affine3d(T');
     
-    % Create coordinate grids
-    [X, Y, Z] = meshgrid(1:cols, 1:rows, 1:slices);
+    % Define the output view to have the same size and resolution as the input.
+    outputView = imref3d(size(volume));
     
-    % Convert to homogeneous coordinates
-    coords = [X(:)'; Y(:)'; Z(:)'; ones(1, numel(X))];
-    
-    % Apply transformation
-    newCoords = T \ coords; % Inverse transform for resampling
-    
-    % Reshape back to grid
-    Xnew = reshape(newCoords(1,:), size(X));
-    Ynew = reshape(newCoords(2,:), size(Y));
-    Znew = reshape(newCoords(3,:), size(Z));
-    
-    % Interpolate volume at new coordinates
-    correctedVolume = interp3(double(volume), Xnew, Ynew, Znew, method, 0);
-    
-    % Convert back to original data type
-    correctedVolume = cast(correctedVolume, class(volume));
+    % Apply the transformation using imwarp.
+    correctedVolume = imwarp(volume, tform, method, 'OutputView', outputView, 'FillValues', 0);
     
     if verbose
         fprintf('Transformation applied using %s interpolation\n', method);

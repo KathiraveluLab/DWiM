@@ -133,7 +133,8 @@ function fileInfo = readAllMetadata(dicomFiles, verbose)
         fprintf('Reading metadata from %d files...\n', numFiles);
     end
     
-    for i = 1:numFiles
+    % Parallelize metadata reading for performance
+    parfor i = 1:numFiles
         try
             info = dicominfo(dicomFiles{i});
             
@@ -151,18 +152,11 @@ function fileInfo = readAllMetadata(dicomFiles, verbose)
                 instanceNumber = info.InstanceNumber;
             else
                 instanceNumber = i;  % Default fallback - may not reflect true order
-                if verbose
-                    warning('dwim:assembleVolume:NoInstanceNumber', ...
-                            'InstanceNumber missing for file %d. Using file index as fallback.', i);
-                end
             end
             
             fileInfoCell{i} = struct('filename', dicomFiles{i}, 'info', info, 'sliceLocation', sliceLocation, 'instanceNumber', instanceNumber);
             
         catch ME
-            if verbose
-                fprintf('Warning: Skipping invalid DICOM file: %s\n', dicomFiles{i});
-            end
             % fileInfoCell{i} will remain empty
         end
     end
@@ -188,7 +182,12 @@ function sortedInfo = sortSlices(fileInfo, sortBy, verbose)
     
     switch sortBy
         case 'SliceLocation'
-            [~, sortIdx] = sort([fileInfo.sliceLocation]);
+            locations = [fileInfo.sliceLocation];
+            if numel(unique(locations)) == 1 && length(locations) > 1
+                warning('dwim:assembleVolume:AmbiguousSort', ...
+                        'All slice locations are identical. Sorting by SliceLocation may result in an incorrect volume order. Consider using ''InstanceNumber''.');
+            end
+            [~, sortIdx] = sort(locations);
         case 'InstanceNumber'
             [~, sortIdx] = sort([fileInfo.instanceNumber]);
         otherwise
@@ -248,30 +247,53 @@ function [volume, assemblyInfo] = assembleVolumeData(sortedInfo, params)
         fprintf('Assembling volume: [%d %d %d]\n', rows, cols, numSlices);
     end
     
-    % Read all slices
-    for i = 1:numSlices
+    % Read all slices - parallelize for performance
+    sliceData = cell(1, numSlices);
+    resizeFlags = false(1, numSlices);
+    errorFlags = false(1, numSlices);
+    
+    parfor i = 1:numSlices
         try
             slice = dicomread(sortedInfo(i).info);
             
-            % Validate slice dimensions
+            % Check slice dimensions
             if ~isequal(size(slice), [rows, cols])
+                resizeFlags(i) = true;
                 if params.AllowResizing
-                    warning('dwim:assembleVolume:DimensionMismatch', ...
-                            'Slice %d has different dimensions, resizing', i);
                     slice = imresize(slice, [rows, cols]);
                 else
-                    error('dwim:assembleVolume:DimensionMismatch', ...
-                          'Slice %d has different dimensions [%d %d], expected [%d %d]. Set ''AllowResizing'' to true to handle this automatically.', ...
-                          i, size(slice, 1), size(slice, 2), rows, cols);
+                    errorFlags(i) = true;
+                    slice = [];
                 end
             end
             
-            volume(:, :, i) = slice;
+            sliceData{i} = slice;
             
         catch ME
-            warning('dwim:assembleVolume:SliceReadError', ...
-                    'Error reading slice %d: %s', i, ME.message);
-            % Leave as zeros
+            errorFlags(i) = true;
+            sliceData{i} = [];
+        end
+    end
+    
+    % Assemble volume from slices and handle errors/warnings
+    for i = 1:numSlices
+        if errorFlags(i)
+            if ~isempty(sliceData{i})
+                % Dimension mismatch with AllowResizing=false
+                error('dwim:assembleVolume:DimensionMismatch', ...
+                      'Slice %d has different dimensions. Set ''AllowResizing'' to true to handle this automatically.', i);
+            else
+                % Read error
+                warning('dwim:assembleVolume:SliceReadError', ...
+                        'Error reading slice %d', i);
+            end
+        elseif resizeFlags(i)
+            warning('dwim:assembleVolume:DimensionMismatch', ...
+                    'Slice %d has different dimensions, resizing', i);
+        end
+        
+        if ~isempty(sliceData{i})
+            volume(:, :, i) = sliceData{i};
         end
     end
     
