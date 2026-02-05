@@ -106,21 +106,23 @@ function dicomFiles = findDicomFiles(dicomPath)
     
     % Also check files without extension (common in some systems)
     allFiles = dir(dicomPath);
-    extlessPaths = {};
+    extlessPaths = cell(length(allFiles), 1);
+    numExtless = 0;
     for i = 1:length(allFiles)
         [~, ~, ext] = fileparts(allFiles(i).name);
         if ~allFiles(i).isdir && isempty(ext)
             filepath = fullfile(allFiles(i).folder, allFiles(i).name);
             try
                 dicominfo(filepath);  % Test if it's a valid DICOM
-                extlessPaths{end+1} = filepath; %#ok<AGROW>
+                numExtless = numExtless + 1;
+                extlessPaths{numExtless} = filepath;
             catch
                 % Not a DICOM file, skip
             end
         end
     end
-    if ~isempty(extlessPaths)
-        dicomFiles = [dicomFiles; extlessPaths'];
+    if numExtless > 0
+        dicomFiles = [dicomFiles; extlessPaths(1:numExtless)];
     end
 end
 
