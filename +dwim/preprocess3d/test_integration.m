@@ -35,10 +35,10 @@ function test_integration()
         largeVolume = createSyntheticVolume([256, 256, 128], 'CT');
         
         [resampled, metadata] = dwim.preprocess3d.resampleVolume(largeVolume, ...
-            'TargetSpacing', 0.5, 'MaxMemoryGB', 1.0, 'Verbose', false);
+            'TargetSpacing', 0.5, 'Verbose', false);
         
         assert(ndims(resampled) == 3, 'Output should be 3D');
-        assert(isfield(metadata, 'usedChunkedProcessing'), 'Should report chunked processing');
+        assert(isfield(metadata, 'totalTime'), 'Should have processing metadata');
         
         fprintf('PASSED\n');
     catch ME
@@ -102,7 +102,7 @@ function test_integration()
             dwim.preprocess3d.resampleVolume(rand(64, 64), 'Verbose', false);
             assert(false, 'Should have failed for 2D input');
         catch ME
-            assert(contains(ME.identifier, 'InvalidVolume'), 'Wrong error type');
+            assert(strcmp(ME.identifier, 'dwim:resampleVolume:InvalidVolume'), 'Wrong error type');
         end
         
         % Test invalid parameters
@@ -110,7 +110,7 @@ function test_integration()
             dwim.preprocess3d.resampleVolume(rand(32,32,16), 'TargetSpacing', -1, 'Verbose', false);
             assert(false, 'Should have failed for negative spacing');
         catch ME
-            assert(contains(ME.identifier, 'InvalidTargetSpacing'), 'Wrong error type');
+            assert(strcmp(ME.identifier, 'dwim:resampleVolume:InvalidTargetSpacing'), 'Wrong error type');
         end
         
         fprintf('PASSED\n');

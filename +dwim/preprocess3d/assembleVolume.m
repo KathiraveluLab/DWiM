@@ -108,19 +108,23 @@ function dicomFiles = findDicomFiles(dicomPath)
     % Also check files without extension (common in some systems)
     allFiles = dir(dicomPath);
     extlessPaths = cell(length(allFiles), 1);
-    numExtless = 0;
+    
+    % Identify potential extension-less files
+    potentialFiles = {};
     for i = 1:length(allFiles)
         [~, ~, ext] = fileparts(allFiles(i).name);
         if ~allFiles(i).isdir && isempty(ext)
-            filepath = fullfile(allFiles(i).folder, allFiles(i).name);
-            if isdicom(filepath)  % Fast header check for DICOM
-                numExtless = numExtless + 1;
-                extlessPaths{numExtless} = filepath;
-            end
+            potentialFiles{end+1} = fullfile(allFiles(i).folder, allFiles(i).name);
         end
     end
-    if numExtless > 0
-        dicomFiles = [dicomFiles; extlessPaths(1:numExtless)];
+    
+    % Parallelize isdicom checks for performance
+    if ~isempty(potentialFiles)
+        isDicomFlags = false(1, length(potentialFiles));
+        parfor i = 1:length(potentialFiles)
+            isDicomFlags(i) = isdicom(potentialFiles{i});
+        end
+        dicomFiles = [dicomFiles; potentialFiles(isDicomFlags)'];
     end
 end
 
@@ -267,7 +271,6 @@ function [volume, assemblyInfo] = assembleVolumeData(sortedInfo, params)
                     slice = imresize(slice, [rows, cols]);
                 else
                     errorFlags(i) = true;
-                    slice = [];
                 end
             end
             

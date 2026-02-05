@@ -30,7 +30,7 @@ function test_resampleVolume()
         dwim.preprocess3d.resampleVolume(rand(64, 64), 'Verbose', false);
         fprintf('FAILED: Should have thrown error for 2D input\n');
     catch ME
-        if contains(ME.identifier, 'InvalidVolume')
+        if strcmp(ME.identifier, 'dwim:resampleVolume:InvalidVolume')
             fprintf('PASSED\n');
         else
             fprintf('FAILED: Wrong error type: %s\n', ME.identifier);
@@ -44,7 +44,7 @@ function test_resampleVolume()
         dwim.preprocess3d.resampleVolume(testVolume, 'TargetSpacing', -1, 'Verbose', false);
         fprintf('FAILED: Should have thrown error for negative spacing\n');
     catch ME
-        if contains(ME.identifier, 'InvalidTargetSpacing')
+        if strcmp(ME.identifier, 'dwim:resampleVolume:InvalidTargetSpacing')
             fprintf('PASSED\n');
         else
             fprintf('FAILED: Wrong error type: %s\n', ME.identifier);
@@ -58,7 +58,7 @@ function test_resampleVolume()
         dwim.preprocess3d.resampleVolume(testVolume, 'Method', 'invalid', 'Verbose', false);
         fprintf('FAILED: Should have thrown error for invalid method\n');
     catch ME
-        if contains(ME.identifier, 'InvalidMethod')
+        if strcmp(ME.identifier, 'dwim:resampleVolume:InvalidMethod')
             fprintf('PASSED\n');
         else
             fprintf('FAILED: Wrong error type: %s\n', ME.identifier);
