@@ -62,7 +62,7 @@ function [correctedVolume, transformMatrix] = correctOrientation(volume, dicomIn
     currentOrientation = determineCurrentOrientation(orientInfo, params.Verbose);
     
     % Calculate transformation matrix
-    transformMatrix = calculateTransformMatrix(currentOrientation, params.TargetOrientation, orientInfo);
+    transformMatrix = calculateTransformMatrix(currentOrientation, params.TargetOrientation);
     
     % Apply transformation
     correctedVolume = applyOrientationTransform(volume, transformMatrix, params.Method, params.Verbose);
@@ -203,8 +203,8 @@ function axis = findPrimaryAxis(direction)
     end
 end
 
-function T = calculateTransformMatrix(currentOrient, targetOrient, orientInfo)
-%CALCULATETRANSFORMMATRIX Calculate 4x4 affine transformation matrix including translation
+function T = calculateTransformMatrix(currentOrient, targetOrient)
+%CALCULATETRANSFORMMATRIX Calculate 4x4 affine transformation matrix
     
     if strcmp(currentOrient, targetOrient)
         T = eye(4);

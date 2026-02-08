@@ -107,16 +107,15 @@ function dicomFiles = findDicomFiles(dicomPath)
     
     % Also check files without extension (common in some systems)
     allFiles = dir(dicomPath);
-    extlessPaths = cell(length(allFiles), 1);
     
-    % Identify potential extension-less files
-    potentialFiles = {};
-    for i = 1:length(allFiles)
+    % Identify potential extension-less files using logical indexing
+    is_potential = false(1, numel(allFiles));
+    for i = 1:numel(allFiles)
         [~, ~, ext] = fileparts(allFiles(i).name);
-        if ~allFiles(i).isdir && isempty(ext)
-            potentialFiles{end+1} = fullfile(allFiles(i).folder, allFiles(i).name);
-        end
+        is_potential(i) = ~allFiles(i).isdir && isempty(ext);
     end
+    potentialFileStructs = allFiles(is_potential);
+    potentialFiles = fullfile({potentialFileStructs.folder}, {potentialFileStructs.name})';
     
     % Parallelize isdicom checks for performance
     if ~isempty(potentialFiles)
@@ -155,7 +154,7 @@ function fileInfo = readAllMetadata(dicomFiles, verbose)
             if isfield(info, 'InstanceNumber')
                 instanceNumber = info.InstanceNumber;
             else
-                instanceNumber = i;  % Default fallback - may not reflect true order
+                instanceNumber = NaN;  % Use NaN as safe fallback in parfor (i is non-deterministic)
             end
             
             fileInfoCell{i} = struct('filename', dicomFiles{i}, 'info', info, 'sliceLocation', sliceLocation, 'instanceNumber', instanceNumber);
