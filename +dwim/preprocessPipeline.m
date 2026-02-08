@@ -1,50 +1,73 @@
 function [output, metadata] = preprocessPipeline(input, config)
 %PREPROCESSPIPELINE Unified preprocessing pipeline for medical imaging
 %
-%   [output, metadata] = preprocessPipeline(input, config)
+%   [output, metadata] = dwim.preprocessPipeline(input, config)
 %       Applies configurable preprocessing pipeline to medical images/volumes
 %
 %   Inputs:
-%       input - Input data (file path, image array, or volume array)
-%       config - Configuration structure defining preprocessing steps
+%       input - Input data (filepath, directory path, or array)
+%       config - Configuration structure with fields:
+%                .inputType - 'filepath', 'dicomdir', 'image', 'volume'
+%                .outputType - 'image', 'volume'
+%                .steps - Cell array of processing steps
+%                .parameters - Structure with step-specific parameters
+%                .validation - Validation settings
+%                .verbose - Display progress (default: true)
 %
 %   Outputs:
-%       output - Processed data (image/volume with same type as input)
-%       metadata - Processing metadata and results
+%       output - Processed image or volume
+%       metadata - Structure with processing information
 %
-%   Configuration Structure:
-%       config.inputType - 'filepath', 'image', 'volume', 'dicomdir'
-%       config.outputType - 'image', 'volume', 'series'
-%       config.steps - Cell array of processing step names
-%       config.parameters - Struct with parameters for each step
-%       config.validation - Validation settings
-%       config.verbose - Display progress information
+%   Processing Steps:
+%       'assemble' - Assemble 3D volume from DICOM series
+%       'orient' - Correct anatomical orientation
+%       'resample' - Resample to isotropic spacing
+%       'window' - Apply windowing preset
+%       'normalize' - Normalize HU values
+%       'validate' - Validate 2D image for ML
+%       'validate_volume' - Validate 3D volume for ML
 %
 %   Example:
+%       % DICOM folder to ML-ready volume
 %       config = struct();
 %       config.inputType = 'dicomdir';
-%       config.steps = {'assemble', 'orient', 'resample', 'validate'};
-%       config.parameters.targetOrientation = 'RAS';
-%       config.parameters.targetSpacing = 1.0;
-%
+%       config.steps = {'assemble', 'orient', 'resample'};
+%       config.parameters.orient.targetOrientation = 'RAS';
+%       config.parameters.resample.targetSpacing = 1.0;
 %       [volume, metadata] = dwim.preprocessPipeline('dicom_folder/', config);
 
-    % Input validation
     arguments
         input
         config (1,1) struct
     end
-
-    % Initialize timing and logging
-    pipelineTimer = tic;
-    metadata = struct();
-    metadata.config = config;
-    metadata.startTime = datetime('now');
-    metadata.steps = {};
-
-    if ~isfield(config, 'verbose') || isempty(config.verbose)
+    
+    % Validate config
+    if ~isfield(config, 'inputType')
+        error('dwim:preprocessPipeline:MissingConfig', 'Config must specify inputType (valid options: ''filepath'', ''dicomdir'', ''image'', ''volume'')');
+    end
+    
+    if ~isfield(config, 'steps')
+        config.steps = {};
+    end
+    
+    if ~isfield(config, 'parameters')
+        config.parameters = struct();
+    end
+    
+    if ~isfield(config, 'validation')
+        config.validation = struct('enabled', true);
+    end
+    
+    if ~isfield(config, 'verbose')
         config.verbose = true;
     end
+    
+    % Initialize metadata and timing
+    pipelineTimer = tic;
+    metadata = struct();
+    metadata.startTime = datetime('now');
+    metadata.config = config;
+    metadata.steps = {};
 
     if config.verbose
         fprintf('DWiM Unified Preprocessing Pipeline\n');

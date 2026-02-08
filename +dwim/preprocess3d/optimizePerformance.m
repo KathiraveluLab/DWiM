@@ -1,0 +1,309 @@
+function results = optimizePerformance(volume, varargin)
+%OPTIMIZEPERFORMANCE Analyze and optimize 3D preprocessing performance
+%
+%   results = optimizePerformance(volume)
+%       Analyzes performance characteristics for the given volume
+%
+%   results = optimizePerformance(volume, 'TargetSpacing', spacing)
+%       Tests performance with specific target spacing
+%
+%   Inputs:
+%       volume - 3D volume for performance testing
+%
+%   Name-Value Arguments:
+%       TargetSpacing - Target spacing for testing (default: 1.0)
+%       VoxelSpacing - Current voxel spacing [x,y,z] in mm (default: [1.0, 1.0, 1.0])
+%       TestGPU - Test GPU performance if available (default: true)
+%       TestMethods - Test different interpolation methods (default: true)
+%       Verbose - Display detailed results (default: true)
+%
+%   Outputs:
+%       results - Structure with performance analysis results
+%
+%   Example:
+%       volume = rand(128, 128, 64);
+%       results = dwim.preprocess3d.optimizePerformance(volume, 'VoxelSpacing', [0.5, 0.5, 1.0]);
+
+    arguments
+        volume {mustBeNumeric}
+        varargin
+    end
+    
+    % Parse arguments
+    p = inputParser;
+    addParameter(p, 'TargetSpacing', 1.0, @(x) isnumeric(x) && x > 0);
+    addParameter(p, 'VoxelSpacing', [1.0, 1.0, 1.0], @(x) isnumeric(x) && (isscalar(x) || numel(x) == 3));
+    addParameter(p, 'TestGPU', true, @islogical);
+    addParameter(p, 'TestMethods', true, @islogical);
+    addParameter(p, 'Verbose', true, @islogical);
+    parse(p, varargin{:});
+    params = p.Results;
+    
+    % Get actual memory size
+    volumeInfo = whos('volume');
+    memSizeMB = volumeInfo.bytes / 1024^2;
+    
+    if params.Verbose
+        fprintf('DWiM 3D Preprocessing Performance Analysis\n');
+        fprintf('=========================================\n');
+        fprintf('Volume size: [%d %d %d]\n', size(volume));
+        fprintf('Data type: %s\n', class(volume));
+        fprintf('Memory size: %.1f MB\n', memSizeMB);
+    end
+    
+    results = struct();
+    results.volumeSize = size(volume);
+    results.dataType = class(volume);
+    results.memorySizeMB = memSizeMB;
+    
+    % Test 1: Baseline performance
+    if params.Verbose
+        fprintf('\nBaseline Performance Test:\n');
+    end
+    
+    tic;
+    [~, metadata] = dwim.preprocess3d.resampleVolume(volume, ...
+        'TargetSpacing', params.TargetSpacing, 'UseGPU', false, 'Verbose', false);
+    baselineTime = toc;
+    
+    results.baseline.time = baselineTime;
+    results.baseline.rate = prod(size(volume)) / baselineTime / 1e6;  % MVoxels/sec
+    
+    if params.Verbose
+        fprintf('  CPU processing: %.3f seconds (%.1f MVox/s)\n', ...
+                baselineTime, results.baseline.rate);
+    end
+    
+    % Test 2: GPU performance (if available and requested)
+    if params.TestGPU
+        if params.Verbose
+            fprintf('\nGPU Performance Test:\n');
+        end
+        
+        try
+            tic;
+            [~, gpuMetadata] = dwim.preprocess3d.resampleVolume(volume, ...
+                'TargetSpacing', params.TargetSpacing, 'UseGPU', true, 'Verbose', false);
+            gpuTime = toc;
+            
+            results.gpu.available = gpuMetadata.usedGPU;
+            results.gpu.time = gpuTime;
+            results.gpu.rate = prod(size(volume)) / gpuTime / 1e6;
+            results.gpu.speedup = baselineTime / gpuTime;
+            
+            if params.Verbose
+                if gpuMetadata.usedGPU
+                    fprintf('  GPU processing: %.3f seconds (%.1f MVox/s, %.1fx speedup)\n', ...
+                            gpuTime, results.gpu.rate, results.gpu.speedup);
+                else
+                    fprintf('  GPU not available\n');
+                end
+            end
+            
+        catch ME
+            results.gpu.available = false;
+            results.gpu.error = ME.message;
+            if params.Verbose
+                fprintf('  GPU test failed: %s\n', ME.message);
+            end
+        end
+    end
+    
+    % Test 3: Different interpolation methods
+    if params.TestMethods
+        if params.Verbose
+            fprintf('\nInterpolation Method Comparison:\n');
+        end
+        
+        methods = {'linear', 'cubic', 'nearest'};
+        results.methods = struct();
+        
+        for i = 1:length(methods)
+            method = methods{i};
+            
+            try
+                tic;
+                dwim.preprocess3d.resampleVolume(volume, ...
+                    'TargetSpacing', params.TargetSpacing, 'Method', method, ...
+                    'UseGPU', false, 'Verbose', false);
+                methodTime = toc;
+                
+                results.methods.(method).time = methodTime;
+                results.methods.(method).rate = prod(size(volume)) / methodTime / 1e6;
+                results.methods.(method).relativeSpeed = baselineTime / methodTime;
+                
+                if params.Verbose
+                    fprintf('  %-8s: %.3f seconds (%.1f MVox/s, %.2fx relative)\n', ...
+                            method, methodTime, results.methods.(method).rate, ...
+                            results.methods.(method).relativeSpeed);
+                end
+                
+            catch ME
+                results.methods.(method).error = ME.message;
+                if params.Verbose
+                    fprintf('  %-8s: FAILED - %s\n', method, ME.message);
+                end
+            end
+        end
+    end
+    
+    % Test 4: Memory usage analysis
+    if params.Verbose
+        fprintf('\nMemory Usage Analysis:\n');
+    end
+    
+    % Get actual element size from whos
+    volumeInfo = whos('volume');
+    elementBytes = volumeInfo.bytes / numel(volume);
+    
+    % Use actual VoxelSpacing for accurate scale factor calculation
+    voxelSpacing = params.VoxelSpacing;
+    if isscalar(voxelSpacing)
+        voxelSpacing = [voxelSpacing, voxelSpacing, voxelSpacing];
+    end
+    
+    inputMemory = prod(size(volume)) * elementBytes / 1024^3;  % GB
+    scaleFactors = voxelSpacing / params.TargetSpacing;  % Per-axis scale factors
+    outputSize = round(size(volume) .* scaleFactors);
+    outputMemory = prod(outputSize) * elementBytes / 1024^3;  % GB (assume same type)
+    totalMemory = inputMemory + outputMemory;
+    
+    results.memory.inputGB = inputMemory;
+    results.memory.outputGB = outputMemory;
+    results.memory.totalGB = totalMemory;
+    results.memory.peakGB = max(inputMemory, outputMemory) * 2;  % Estimate peak usage
+    
+    if params.Verbose
+        fprintf('  Input volume: %.2f GB\n', inputMemory);
+        fprintf('  Output volume: %.2f GB\n', outputMemory);
+        fprintf('  Total memory: %.2f GB\n', totalMemory);
+        fprintf('  Peak estimate: %.2f GB\n', results.memory.peakGB);
+    end
+    
+    % Test 5: Scaling analysis
+    if params.Verbose
+        fprintf('\nScaling Factor Analysis:\n');
+    end
+    
+    spacings = [2.0, 1.0, 0.5, 0.25];  % Different target spacings
+    results.scaling = struct();
+    
+    for i = 1:length(spacings)
+        spacing = spacings(i);
+        
+        try
+            tic;
+            [resampled, ~] = dwim.preprocess3d.resampleVolume(volume, ...
+                'TargetSpacing', spacing, 'UseGPU', false, 'Verbose', false);
+            scalingTime = toc;
+            
+            volumeRatio = prod(size(resampled)) / prod(size(volume));
+            
+            % Create valid field name
+            fieldName = genvarname(sprintf('spacing_%.2f', spacing));
+            results.scaling.(fieldName).time = scalingTime;
+            results.scaling.(fieldName).volumeRatio = volumeRatio;
+            results.scaling.(fieldName).outputSize = size(resampled);
+            
+            if params.Verbose
+                fprintf('  %.2f mm: %.3f sec, %.1fx volume, [%d %d %d]\n', ...
+                        spacing, scalingTime, volumeRatio, size(resampled));
+            end
+            
+        catch ME
+            if params.Verbose
+                fprintf('  %.2f mm: FAILED - %s\n', spacing, ME.message);
+            end
+        end
+    end
+    
+    % Generate recommendations
+    results.recommendations = generateRecommendations(results, params);
+    
+    if params.Verbose
+        fprintf('\nPerformance Recommendations:\n');
+        for i = 1:length(results.recommendations)
+            fprintf('  %d. %s\n', i, results.recommendations{i});
+        end
+        fprintf('=========================================\n');
+    end
+end
+
+function recommendations = generateRecommendations(results, params)
+%GENERATERECOMMENDATIONS Generate performance optimization recommendations
+    recommendations = {};
+    
+    % Constants for recommendation thresholds
+    CHUNKED_PROCESSING_THRESHOLD_GB = 8;
+    SINGLE_PRECISION_THRESHOLD_GB = 16;
+    GPU_RECOMMEND_SPEEDUP = 2.0;
+    GPU_OVERHEAD_THRESHOLD = 1.2;
+    CUBIC_LINEAR_SLOWER_THRESHOLD = 3.0;
+    CUBIC_LINEAR_MINIMAL_PENALTY = 1.5;
+    SUBOPTIMAL_PERFORMANCE_RATE_MVPS = 1.0;
+    EXCELLENT_PERFORMANCE_RATE_MVPS = 10.0;
+    LARGE_UPSAMPLING_RATIO = 100;
+    LARGE_DOWNSAMPLING_RATIO = 0.01;
+    
+    % Memory recommendations
+    if results.memory.peakGB > CHUNKED_PROCESSING_THRESHOLD_GB
+        recommendations = [recommendations, {sprintf('Consider using chunked processing for large volumes (>%dGB peak memory)', CHUNKED_PROCESSING_THRESHOLD_GB)}];
+    end
+    
+    if results.memory.peakGB > SINGLE_PRECISION_THRESHOLD_GB
+        recommendations = [recommendations, {'Use single precision data type to reduce memory usage by 50%'}];
+    end
+    
+    % GPU recommendations
+    if isfield(results, 'gpu') && results.gpu.available
+        if results.gpu.speedup > GPU_RECOMMEND_SPEEDUP
+            recommendations = [recommendations, {sprintf('GPU provides %.1fx speedup - recommended for this volume size', results.gpu.speedup)}];
+        elseif results.gpu.speedup < GPU_OVERHEAD_THRESHOLD
+            recommendations = [recommendations, {'GPU overhead exceeds benefits for this volume size - use CPU'}];
+        end
+    elseif params.TestGPU
+        recommendations = [recommendations, {'Consider GPU acceleration for larger volumes if available'}];
+    end
+    
+    % Method recommendations
+    if isfield(results, 'methods')
+        if isfield(results.methods, 'linear') && isfield(results.methods, 'cubic')
+            if results.methods.cubic.time / results.methods.linear.time > CUBIC_LINEAR_SLOWER_THRESHOLD
+                recommendations = [recommendations, {'Linear interpolation recommended for speed (cubic is 3x slower)'}];
+            elseif results.methods.cubic.time / results.methods.linear.time < CUBIC_LINEAR_MINIMAL_PENALTY
+                recommendations = [recommendations, {'Cubic interpolation provides better quality with minimal speed penalty'}];
+            end
+        end
+        
+        if isfield(results.methods, 'nearest')
+            recommendations = [recommendations, {'Use nearest neighbor interpolation for segmentation masks'}];
+        end
+    end
+    
+    % Performance recommendations
+    if results.baseline.rate < SUBOPTIMAL_PERFORMANCE_RATE_MVPS
+        recommendations = [recommendations, {'Performance is below optimal - consider smaller target spacing or GPU acceleration'}];
+    elseif results.baseline.rate > EXCELLENT_PERFORMANCE_RATE_MVPS
+        recommendations = [recommendations, {'Excellent performance - current settings are well-optimized'}];
+    end
+    
+    % Scaling recommendations
+    if isfield(results, 'scaling')
+        scalingFields = fieldnames(results.scaling);
+        for i = 1:length(scalingFields)
+            field = scalingFields{i};
+            if isfield(results.scaling.(field), 'volumeRatio')
+                ratio = results.scaling.(field).volumeRatio;
+                if ratio > LARGE_UPSAMPLING_RATIO
+                    recommendations = [recommendations, {'Very large upsampling detected - verify target spacing is appropriate'}];
+                elseif ratio < LARGE_DOWNSAMPLING_RATIO
+                    recommendations = [recommendations, {'Very large downsampling detected - may lose important details'}];
+                end
+            end
+        end
+    end
+    
+    if isempty(recommendations)
+        recommendations = {'Current configuration appears optimal for this volume'};
+    end
+end
