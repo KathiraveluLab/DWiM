@@ -2,14 +2,14 @@ function outputFile = scrub(inputFile, outputFolder)
     % SCRUB Removes standard PHI (Patient Health Info) from a DICOM file.
     % Usage: scrub('path/to/image.dcm', 'path/to/output_folder')
     
-    % Constants for maintainability
-    DEFAULT_SUBFOLDER = 'anonymized';
-    ANON_SUFFIX = '_anon';
-
     arguments
         inputFile (1,1) string
         outputFolder (1,1) string = ""
     end
+
+    % Constants for maintainability
+    DEFAULT_SUBFOLDER = 'anonymized';
+    ANON_SUFFIX = '_anon';
 
     % 1. Safety Check
     [~, status] = dwim.internal.readDicomSafe(inputFile);
@@ -20,7 +20,6 @@ function outputFile = scrub(inputFile, outputFolder)
     % 2. Determine Output Path
     [p, f, ext] = fileparts(inputFile);
     
-    % Use defined constants instead of magic strings
     if outputFolder == ""
         outputFolder = fullfile(p, DEFAULT_SUBFOLDER);
     end
@@ -29,7 +28,9 @@ function outputFile = scrub(inputFile, outputFolder)
         mkdir(outputFolder);
     end
     
-    outputFile = fullfile(outputFolder, f + ANON_SUFFIX + ext);
+    % fileparts returns chars, so we use string() to ensure '+' joins them textually
+    filenameStr = string(f) + ANON_SUFFIX + string(ext);
+    outputFile = fullfile(outputFolder, filenameStr);
 
     % 3. Run Anonymization
     try
