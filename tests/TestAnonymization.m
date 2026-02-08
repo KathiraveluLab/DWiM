@@ -1,45 +1,36 @@
 classdef TestAnonymization < matlab.unittest.TestCase
     methods(Test)
         function testBasicScrubbing(testCase)
-            % 1. Setup: Create a dummy file WITH specific PHI
-            root = fileparts(fileparts(mfilename('fullpath')));
+            % 1. Setup: Use a temporary directory to avoid polluting the source tree
+            tempDir = tempname;
+            mkdir(tempDir);
             
-            % Ensure 'test_data' folder exists before writing to it
-            testDataDir = fullfile(root, 'test_data');
-            if ~exist(testDataDir, 'dir')
-                mkdir(testDataDir);
-            end
+            % Ensure cleanup happens even if the test fails
+            testCase.addTeardown(@() rmdir(tempDir, 's'));
             
-            tempInput = fullfile(testDataDir, 'phi_test.dcm');
+            tempInput = fullfile(tempDir, 'phi_test.dcm');
             
             % Write a file specifically with PatientName = 'Doe'
             dummyImg = uint8(zeros(10, 10));
             dicomwrite(dummyImg, tempInput, 'PatientName', 'Doe');
             
-            % 2. Verify the ORIGINAL file has the PHI (False Positive Prevention)
+            % 2. Verify the ORIGINAL file has the PHI
             origMeta = dicominfo(tempInput);
             testCase.verifyEqual(origMeta.PatientName.FamilyName, 'Doe', ...
                 'Test Setup Failed: Input file did not contain expected PHI.');
             
             % 3. Run Scrubbing
+            % The function will create an 'anonymized' subdirectory inside tempDir
             anonFile = dwim.anonymize.scrub(tempInput);
             
             % 4. Verify File Exists
-            testCase.verifyTrue(exist(anonFile, 'file') == 2, 'Output file missing.');
+            testCase.verifyTrue(exist(anonFile, 'file') == 2, 'Output file was not created.');
             
             % 5. Verify PHI Removal
             newMeta = dicominfo(anonFile);
             if isfield(newMeta, 'PatientName')
                  testCase.verifyFalse(strcmp(newMeta.PatientName.FamilyName, 'Doe'), ...
-                    'PatientName was not removed!');
-            end
-                
-            % Cleanup
-            delete(tempInput);
-            delete(anonFile);
-            % only remove dir if it's empty to avoid messing up other tests
-            if exist(fileparts(anonFile), 'dir')
-                rmdir(fileparts(anonFile));
+                    'PatientName was not scrubbed!');
             end
         end
     end

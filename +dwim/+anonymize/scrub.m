@@ -29,7 +29,8 @@ function outputFile = scrub(inputFile, outputFolder)
     try
         dicomanon(char(inputFile), char(outputFile));
     catch ME
-        error('DWiM:AnonymizeFailed', 'Failed to scrub file: %s', ME.message);
+        % Improved error message including the filename
+        error('DWiM:AnonymizeFailed', 'Failed to scrub file "%s": %s', inputFile, ME.message);
     end
     
     % 4. Verify Success
@@ -37,4 +38,3 @@ function outputFile = scrub(inputFile, outputFolder)
         error('DWiM:WriteError', 'Anonymization ran but no file was created.');
     end
 end
-% Fixed: Added newline at end of file for Git compliance
