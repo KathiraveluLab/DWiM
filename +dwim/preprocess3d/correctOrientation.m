@@ -77,11 +77,10 @@ function orientInfo = extractOrientationInfo(dicomInfo, verbose)
 %EXTRACTORIENTATIONINFO Extract orientation tags from DICOM info
     
     % Handle array of DICOM info structures
-    if iscell(dicomInfo) || (isstruct(dicomInfo) && length(dicomInfo) > 1)
+    if iscell(dicomInfo)
+        firstInfo = dicomInfo{1};
+    elseif isstruct(dicomInfo) && ~isscalar(dicomInfo)
         firstInfo = dicomInfo(1);
-        if iscell(dicomInfo)
-            firstInfo = dicomInfo{1};
-        end
     else
         firstInfo = dicomInfo;
     end

@@ -123,7 +123,7 @@ function dicomFiles = findDicomFiles(dicomPath)
         parfor i = 1:length(potentialFiles)
             isDicomFlags(i) = isdicom(potentialFiles{i});
         end
-        dicomFiles = [dicomFiles; potentialFiles(isDicomFlags)'];
+        dicomFiles = [dicomFiles; potentialFiles(isDicomFlags)];
     end
 end
 
