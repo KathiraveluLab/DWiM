@@ -11,7 +11,6 @@ function [updateAttributes, keepAttributes] = getProfile(profileName)
     switch lower(profileName)
         case 'strict'
             % Strict: Remove everything. 
-            % We define updates to force "ANONYMIZED" or empty values.
             updateAttributes = struct();
             updateAttributes.PatientName = 'ANONYMIZED';
             updateAttributes.PatientID = 'ANONYMIZED';
@@ -25,7 +24,10 @@ function [updateAttributes, keepAttributes] = getProfile(profileName)
             % Research: Mask Identity, but KEEP Demographics
             updateAttributes = struct();
             updateAttributes.PatientName = 'RESEARCH_SUB'; 
-            updateAttributes.PatientID = 'RES_001';
+            
+            % Use a unique UUID to prevent data merging collisions
+            updateAttributes.PatientID = ['RES_' char(java.util.UUID.randomUUID)];
+            
             updateAttributes.InstitutionName = 'RESEARCH_LAB';
             
             % Explicitly tell dicomanon NOT to remove these

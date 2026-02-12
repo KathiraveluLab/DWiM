@@ -20,13 +20,12 @@ classdef TestProfiles < matlab.unittest.TestCase
             % 3. Verify
             meta = dicominfo(anonFile);
             
-            % dicominfo might return a struct OR a simple string for PatientName.
+            % Robust Name Check (handles struct vs string return)
             pName = meta.PatientName;
             if isstruct(pName)
                  if isfield(pName, 'FamilyName')
                      pName = pName.FamilyName;
                  else
-                     % Fallback: grab the first field if FamilyName is missing
                      vals = struct2cell(pName);
                      pName = vals{1};
                  end
@@ -57,12 +56,24 @@ classdef TestProfiles < matlab.unittest.TestCase
             % 3. Verify
             meta = dicominfo(anonFile);
             
-            % Age should be GONE (Empty)
-            % Note: Check if field exists first to be safe
+            % Check 1: Age should be GONE (Empty)
             if isfield(meta, 'PatientAge')
                 testCase.verifyTrue(isempty(meta.PatientAge), ...
                     'Strict profile failed to remove PatientAge');
             end
+            
+            % Check 2: Name should be explicitly 'ANONYMIZED'
+            % Handling standard DICOM structure for Name
+            pName = meta.PatientName;
+            if isstruct(pName) && isfield(pName, 'FamilyName')
+                pName = pName.FamilyName;
+            elseif isstruct(pName)
+                 vals = struct2cell(pName);
+                 pName = vals{1};
+            end
+            
+            testCase.verifyEqual(pName, 'ANONYMIZED', ...
+                'Strict profile failed to anonymize PatientName to default value');
         end
     end
 end
