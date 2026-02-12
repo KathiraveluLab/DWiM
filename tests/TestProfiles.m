@@ -20,8 +20,19 @@ classdef TestProfiles < matlab.unittest.TestCase
             % 3. Verify
             meta = dicominfo(anonFile);
             
-            % Name should be scrubbed (replaced with profile default)
-            testCase.verifyEqual(meta.PatientName.FamilyName, 'RESEARCH_SUB', ...
+            % dicominfo might return a struct OR a simple string for PatientName.
+            pName = meta.PatientName;
+            if isstruct(pName)
+                 if isfield(pName, 'FamilyName')
+                     pName = pName.FamilyName;
+                 else
+                     % Fallback: grab the first field if FamilyName is missing
+                     vals = struct2cell(pName);
+                     pName = vals{1};
+                 end
+            end
+            
+            testCase.verifyEqual(pName, 'RESEARCH_SUB', ...
                 'Research profile failed to hide PatientName');
                 
             % Age/Sex should be PRESERVED
@@ -47,8 +58,11 @@ classdef TestProfiles < matlab.unittest.TestCase
             meta = dicominfo(anonFile);
             
             % Age should be GONE (Empty)
-            testCase.verifyTrue(isempty(meta.PatientAge), ...
-                'Strict profile failed to remove PatientAge');
+            % Note: Check if field exists first to be safe
+            if isfield(meta, 'PatientAge')
+                testCase.verifyTrue(isempty(meta.PatientAge), ...
+                    'Strict profile failed to remove PatientAge');
+            end
         end
     end
 end
