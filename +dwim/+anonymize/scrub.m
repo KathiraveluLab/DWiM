@@ -1,13 +1,13 @@
-function outputFile = scrub(inputFile, outputFolder)
-    % SCRUB Removes standard PHI (Patient Health Info) from a DICOM file.
-    % Usage: scrub('path/to/image.dcm', 'path/to/output_folder')
+function outputFile = scrub(inputFile, outputFolder, profileName)
+    % SCRUB Removes PHI based on a specific profile.
     
     arguments
         inputFile (1,1) string
         outputFolder (1,1) string = ""
+        profileName (1,1) string = "strict"
     end
 
-    % Constants for maintainability
+    % Constants
     DEFAULT_SUBFOLDER = 'anonymized';
     ANON_SUFFIX = '_anon';
 
@@ -17,29 +17,39 @@ function outputFile = scrub(inputFile, outputFolder)
         error('DWiM:ReadError', status.message);
     end
 
-    % 2. Determine Output Path
+    % 2. Output Path
     [p, f, ext] = fileparts(inputFile);
-    
     if outputFolder == ""
         outputFolder = fullfile(p, DEFAULT_SUBFOLDER);
     end
-    
     if ~exist(outputFolder, 'dir')
         mkdir(outputFolder);
     end
     
-    % fileparts returns chars, so we use string() to ensure '+' joins them textually
     filenameStr = string(f) + ANON_SUFFIX + string(ext);
     outputFile = fullfile(outputFolder, filenameStr);
 
-    % 3. Run Anonymization
+    % 3. Get Profile Settings
+    % Now retrieves BOTH the update struct AND the keep list
+    [updateAttributes, keepAttributes] = dwim.anonymize.getProfile(profileName);
+
+    % 4. Run Anonymization
     try
-        dicomanon(char(inputFile), char(outputFile));
+        % We check if we have specific tags to keep.
+        if isempty(keepAttributes)
+            dicomanon(char(inputFile), char(outputFile), ...
+                'update', updateAttributes);
+        else
+            % Pass the 'keep' argument to protect demographic data
+            dicomanon(char(inputFile), char(outputFile), ...
+                'update', updateAttributes, ...
+                'keep', keepAttributes);
+        end
     catch ME
         error('DWiM:AnonymizeFailed', 'Failed to scrub file "%s": %s', inputFile, ME.message);
     end
     
-    % 4. Verify Success
+    % 5. Verify
     if ~exist(outputFile, 'file')
         error('DWiM:WriteError', 'Anonymization ran but no file was created.');
     end
