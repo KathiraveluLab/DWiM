@@ -11,6 +11,7 @@ function test_validationGuards()
         if ~exist(tempDir, 'dir')
             mkdir(tempDir);
         end
+        cleanup1 = onCleanup(@() rmdir(tempDir, 's'));
         
         result = dwim.ml.validatePreprocessingInput(tempDir, 'Verbose', false);
         
@@ -18,7 +19,6 @@ function test_validationGuards()
         assert(strcmp(result.errors{1}.identifier, 'DWiM:Validation:EmptyFolder'), ...
                'Should have EmptyFolder error');
         
-        rmdir(tempDir);
         fprintf('PASSED\n');
     catch ME
         fprintf('FAILED: %s\n', ME.message);
@@ -47,6 +47,66 @@ function test_validationGuards()
         assert(isfield(result.errors{1}, 'message'), 'Error should have message');
         assert(startsWith(result.errors{1}.identifier, 'DWiM:Validation:'), ...
                'Identifier should follow DWiM:Validation: pattern');
+        
+        fprintf('PASSED\n');
+    catch ME
+        fprintf('FAILED: %s\n', ME.message);
+    end
+    
+    % Test 4: Metadata validation with mock DICOM
+    fprintf('Test 4: Metadata validation... ');
+    try
+        tempDir = fullfile(tempdir, 'dwim_test_metadata');
+        if ~exist(tempDir, 'dir')
+            mkdir(tempDir);
+        end
+        cleanup2 = onCleanup(@() rmdir(tempDir, 's'));
+        
+        % Create a minimal mock DICOM file
+        mockFile = fullfile(tempDir, 'test.dcm');
+        fid = fopen(mockFile, 'w');
+        fwrite(fid, zeros(1, 132), 'uint8');
+        fwrite(fid, 'DICM', 'char');
+        fclose(fid);
+        
+        result = dwim.ml.validatePreprocessingInput(tempDir, 'Verbose', false);
+        
+        % Should detect metadata issues or fail to read
+        assert(~result.valid || ~isempty(result.warnings), ...
+               'Should detect metadata issues or warnings');
+        
+        fprintf('PASSED\n');
+    catch ME
+        fprintf('FAILED: %s\n', ME.message);
+    end
+    
+    % Test 5: Spacing validation with insufficient slices
+    fprintf('Test 5: Spacing validation with insufficient slices... ');
+    try
+        tempDir = fullfile(tempdir, 'dwim_test_spacing');
+        if ~exist(tempDir, 'dir')
+            mkdir(tempDir);
+        end
+        cleanup3 = onCleanup(@() rmdir(tempDir, 's'));
+        
+        % Create a single mock DICOM file
+        mockFile = fullfile(tempDir, 'slice1.dcm');
+        fid = fopen(mockFile, 'w');
+        fwrite(fid, zeros(1, 132), 'uint8');
+        fwrite(fid, 'DICM', 'char');
+        fclose(fid);
+        
+        result = dwim.ml.validatePreprocessingInput(tempDir, 'Verbose', false, 'CheckMetadata', false);
+        
+        % Should warn about insufficient slices
+        hasSpacingWarning = false;
+        for i = 1:length(result.warnings)
+            if contains(result.warnings{i}, 'Insufficient')
+                hasSpacingWarning = true;
+                break;
+            end
+        end
+        assert(hasSpacingWarning, 'Should warn about insufficient slices');
         
         fprintf('PASSED\n');
     catch ME

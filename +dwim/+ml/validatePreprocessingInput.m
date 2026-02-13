@@ -41,8 +41,8 @@ function result = validatePreprocessingInput(inputPath, varargin)
         fprintf('===================================\n');
     end
     
-    % Guard 1: Empty folder check
-    emptyCheck = checkEmptyFolder(inputPath, params.Verbose);
+    % Guard 1: Empty folder check and get DICOM files
+    [emptyCheck, dicomFiles] = checkEmptyFolder(inputPath, params.Verbose);
     if ~emptyCheck.passed
         result.valid = false;
         result.errors{end+1} = emptyCheck.error;
@@ -51,7 +51,7 @@ function result = validatePreprocessingInput(inputPath, varargin)
     
     % Guard 2: Missing metadata check
     if params.CheckMetadata
-        metadataCheck = checkMetadata(inputPath, params.Verbose);
+        metadataCheck = checkMetadata(dicomFiles, params.Verbose);
         if ~metadataCheck.passed
             result.valid = false;
             result.errors = [result.errors, metadataCheck.errors];
@@ -61,7 +61,7 @@ function result = validatePreprocessingInput(inputPath, varargin)
     
     % Guard 3: Slice spacing consistency check
     if params.CheckSpacing
-        spacingCheck = checkSliceSpacing(inputPath, params.Verbose);
+        spacingCheck = checkSliceSpacing(dicomFiles, params.Verbose);
         if ~spacingCheck.passed
             result.warnings = [result.warnings, spacingCheck.warnings];
         end
@@ -69,15 +69,20 @@ function result = validatePreprocessingInput(inputPath, varargin)
     end
     
     if params.Verbose
-        fprintf('Validation: %s\n', ternary(result.valid, 'PASSED', 'FAILED'));
+        if result.valid
+            fprintf('Validation: PASSED\n');
+        else
+            fprintf('Validation: FAILED\n');
+        end
         fprintf('===================================\n');
     end
 end
 
-function result = checkEmptyFolder(inputPath, verbose)
+function [result, dicomFiles] = checkEmptyFolder(inputPath, verbose)
 %CHECKEMPTYFOLDER Guard against empty input folders
     
     result = struct('passed', true, 'error', struct());
+    dicomFiles = [];
     
     if ~exist(inputPath, 'dir')
         result.passed = false;
@@ -108,13 +113,10 @@ function result = checkEmptyFolder(inputPath, verbose)
     end
 end
 
-function result = checkMetadata(inputPath, verbose)
+function result = checkMetadata(dicomFiles, verbose)
 %CHECKMETADATA Guard against missing critical DICOM metadata
     
     result = struct('passed', true, 'errors', {{}}, 'warnings', {{}});
-    
-    dicomFiles = [dir(fullfile(inputPath, '*.dcm')); ...
-                  dir(fullfile(inputPath, '*.dicom'))];
     
     requiredFields = {'ImagePositionPatient', 'ImageOrientationPatient', 'PixelSpacing'};
     missingCount = 0;
@@ -150,13 +152,10 @@ function result = checkMetadata(inputPath, verbose)
     end
 end
 
-function result = checkSliceSpacing(inputPath, verbose)
+function result = checkSliceSpacing(dicomFiles, verbose)
 %CHECKSLICESPACING Check slice spacing consistency
     
     result = struct('passed', true, 'warnings', {{}}, 'info', struct());
-    
-    dicomFiles = [dir(fullfile(inputPath, '*.dcm')); ...
-                  dir(fullfile(inputPath, '*.dicom'))];
     
     if length(dicomFiles) < 2
         result.warnings{end+1} = 'Insufficient slices for spacing check';
@@ -164,6 +163,7 @@ function result = checkSliceSpacing(inputPath, verbose)
     end
     
     positions = zeros(length(dicomFiles), 3);
+    validCount = 0;
     
     for i = 1:length(dicomFiles)
         filePath = fullfile(dicomFiles(i).folder, dicomFiles(i).name);
@@ -171,17 +171,30 @@ function result = checkSliceSpacing(inputPath, verbose)
             info = dicominfo(filePath);
             if isfield(info, 'ImagePositionPatient')
                 positions(i, :) = info.ImagePositionPatient';
+                validCount = validCount + 1;
             elseif isfield(info, 'SliceLocation')
                 positions(i, 3) = info.SliceLocation;
+                validCount = validCount + 1;
             end
-        catch
+        catch ME
+            if verbose
+                fprintf('WARNING: Could not read metadata from %s. Skipping for spacing calculation. Error: %s\n', dicomFiles(i).name, ME.message);
+            end
             continue;
         end
     end
     
+    if validCount < 2
+        result.warnings{end+1} = 'Insufficient valid slices for spacing check';
+        return;
+    end
+    
+    % Remove invalid positions (all zeros)
+    validPositions = positions(any(positions, 2), :);
+    
     % Calculate slice spacings
-    [~, sortIdx] = sort(positions(:, 3));
-    sortedPositions = positions(sortIdx, :);
+    [~, sortIdx] = sort(validPositions(:, 3));
+    sortedPositions = validPositions(sortIdx, :);
     spacings = diff(sortedPositions(:, 3));
     
     if ~isempty(spacings)
@@ -206,10 +219,3 @@ function result = checkSliceSpacing(inputPath, verbose)
     end
 end
 
-function result = ternary(condition, trueVal, falseVal)
-    if condition
-        result = trueVal;
-    else
-        result = falseVal;
-    end
-end
