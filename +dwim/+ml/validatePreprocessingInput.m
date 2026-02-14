@@ -45,7 +45,7 @@ function result = validatePreprocessingInput(inputPath, varargin)
         metadataCheck = checkMetadata(dicomFiles, options.Verbose);
         if ~metadataCheck.passed
             result.valid = false;
-            result.errors = [result.errors, metadataCheck.errors];
+            result.errors = metadataCheck.errors;
         end
     end
     
@@ -121,7 +121,6 @@ function result = checkMetadata(dicomFiles, verbose)
                         'identifier', 'DWiM:Validation:MissingMetadata', ...
                         'message', sprintf('Missing critical field ''%s'' in %s', field, dicomFiles(i).name));
                     result.errors{end+1} = err;
-                    result.passed = false;
                 end
             end
             
@@ -129,9 +128,10 @@ function result = checkMetadata(dicomFiles, verbose)
             result.errors{end+1} = struct(...
                 'identifier', 'DWiM:Validation:MissingMetadata', ...
                 'message', sprintf('Failed to read metadata from %s: %s', dicomFiles(i).name, ME.message));
-            result.passed = false;
         end
     end
+    
+    result.passed = isempty(result.errors);
     
     if result.passed && verbose
         fprintf('Metadata validation: PASSED\n');
