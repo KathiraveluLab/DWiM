@@ -74,6 +74,8 @@ function test_validationGuards()
         % Should fail validation due to missing metadata or read errors
         assert(~result.valid, ...
                'Should fail validation for files with missing/unreadable metadata');
+        assert(strcmp(result.errors{1}.identifier, 'DWiM:Validation:MissingMetadata'), ...
+               'Should have MissingMetadata error for unreadable file');
         
         fprintf('PASSED\n');
     catch ME
