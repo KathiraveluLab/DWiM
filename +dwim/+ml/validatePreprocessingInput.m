@@ -25,11 +25,7 @@ function result = validatePreprocessingInput(inputPath, varargin)
         options.Verbose (1,1) logical = true
     end
     
-    result = struct();
-    result.valid = true;
-    result.errors = {};
-    result.warnings = {};
-    result.path = inputPath;
+    result = struct('valid', true, 'errors', {{}}, 'warnings', {{}}, 'path', inputPath, 'spacingInfo', struct());
     
     if options.Verbose
         fprintf('DWiM Preprocessing Input Validation\n');
@@ -51,15 +47,12 @@ function result = validatePreprocessingInput(inputPath, varargin)
             result.valid = false;
             result.errors = [result.errors, metadataCheck.errors];
         end
-        result.warnings = [result.warnings, metadataCheck.warnings];
     end
     
     % Guard 3: Slice spacing consistency check
     if options.CheckSpacing
         spacingCheck = checkSliceSpacing(dicomFiles, options.Verbose);
-        if ~spacingCheck.passed
-            result.warnings = [result.warnings, spacingCheck.warnings];
-        end
+        result.warnings = [result.warnings, spacingCheck.warnings];
         result.spacingInfo = spacingCheck.info;
     end
     
@@ -111,7 +104,7 @@ end
 function result = checkMetadata(dicomFiles, verbose)
 %CHECKMETADATA Guard against missing critical DICOM metadata
     
-    result = struct('passed', true, 'errors', {{}}, 'warnings', {{}});
+    result = struct('passed', true, 'errors', {{}});
     
     requiredFields = {'ImagePositionPatient', 'ImageOrientationPatient', 'PixelSpacing'};
     

@@ -99,13 +99,7 @@ function test_validationGuards()
         result = dwim.ml.validatePreprocessingInput(tempDir, 'Verbose', false, 'CheckMetadata', false);
         
         % Should warn about insufficient slices
-        hasSpacingWarning = false;
-        for i = 1:length(result.warnings)
-            if contains(result.warnings{i}, 'Insufficient')
-                hasSpacingWarning = true;
-                break;
-            end
-        end
+        hasSpacingWarning = any(contains(result.warnings, 'Insufficient'));
         assert(hasSpacingWarning, 'Should warn about insufficient slices');
         
         fprintf('PASSED\n');
