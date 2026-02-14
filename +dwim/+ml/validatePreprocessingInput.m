@@ -20,15 +20,10 @@ function result = validatePreprocessingInput(inputPath, varargin)
 
     arguments
         inputPath (1,1) string
-        varargin
+        options.CheckMetadata (1,1) logical = true
+        options.CheckSpacing (1,1) logical = true
+        options.Verbose (1,1) logical = true
     end
-    
-    p = inputParser;
-    addParameter(p, 'CheckMetadata', true, @islogical);
-    addParameter(p, 'CheckSpacing', true, @islogical);
-    addParameter(p, 'Verbose', true, @islogical);
-    parse(p, varargin{:});
-    params = p.Results;
     
     result = struct();
     result.valid = true;
@@ -36,13 +31,13 @@ function result = validatePreprocessingInput(inputPath, varargin)
     result.warnings = {};
     result.path = inputPath;
     
-    if params.Verbose
+    if options.Verbose
         fprintf('DWiM Preprocessing Input Validation\n');
         fprintf('===================================\n');
     end
     
     % Guard 1: Empty folder check and get DICOM files
-    [emptyCheck, dicomFiles] = checkEmptyFolder(inputPath, params.Verbose);
+    [emptyCheck, dicomFiles] = checkEmptyFolder(inputPath, options.Verbose);
     if ~emptyCheck.passed
         result.valid = false;
         result.errors{end+1} = emptyCheck.error;
@@ -50,8 +45,8 @@ function result = validatePreprocessingInput(inputPath, varargin)
     end
     
     % Guard 2: Missing metadata check
-    if params.CheckMetadata
-        metadataCheck = checkMetadata(dicomFiles, params.Verbose);
+    if options.CheckMetadata
+        metadataCheck = checkMetadata(dicomFiles, options.Verbose);
         if ~metadataCheck.passed
             result.valid = false;
             result.errors = [result.errors, metadataCheck.errors];
@@ -60,15 +55,15 @@ function result = validatePreprocessingInput(inputPath, varargin)
     end
     
     % Guard 3: Slice spacing consistency check
-    if params.CheckSpacing
-        spacingCheck = checkSliceSpacing(dicomFiles, params.Verbose);
+    if options.CheckSpacing
+        spacingCheck = checkSliceSpacing(dicomFiles, options.Verbose);
         if ~spacingCheck.passed
             result.warnings = [result.warnings, spacingCheck.warnings];
         end
         result.spacingInfo = spacingCheck.info;
     end
     
-    if params.Verbose
+    if options.Verbose
         if result.valid
             fprintf('Validation: PASSED\n');
         else
@@ -119,7 +114,6 @@ function result = checkMetadata(dicomFiles, verbose)
     result = struct('passed', true, 'errors', {{}}, 'warnings', {{}});
     
     requiredFields = {'ImagePositionPatient', 'ImageOrientationPatient', 'PixelSpacing'};
-    missingCount = 0;
     
     for i = 1:min(5, length(dicomFiles)) % Check first 5 files
         filePath = fullfile(dicomFiles(i).folder, dicomFiles(i).name);
@@ -130,8 +124,11 @@ function result = checkMetadata(dicomFiles, verbose)
             for j = 1:length(requiredFields)
                 field = requiredFields{j};
                 if ~isfield(info, field)
-                    missingCount = missingCount + 1;
-                    result.warnings{end+1} = sprintf('Missing %s in %s', field, dicomFiles(i).name);
+                    err = struct(...
+                        'identifier', 'DWiM:Validation:MissingMetadata', ...
+                        'message', sprintf('Missing critical field ''%s'' in %s', field, dicomFiles(i).name));
+                    result.errors{end+1} = err;
+                    result.passed = false;
                 end
             end
             
@@ -143,12 +140,10 @@ function result = checkMetadata(dicomFiles, verbose)
         end
     end
     
-    if missingCount > 0 && verbose
-        fprintf('WARNING: %d metadata fields missing across sampled files\n', missingCount);
-    end
-    
     if result.passed && verbose
         fprintf('Metadata validation: PASSED\n');
+    elseif ~result.passed && verbose
+        fprintf('ERROR: Critical metadata fields missing or unreadable\n');
     end
 end
 
@@ -163,7 +158,7 @@ function result = checkSliceSpacing(dicomFiles, verbose)
     end
     
     positions = zeros(length(dicomFiles), 3);
-    validCount = 0;
+    isValid = false(length(dicomFiles), 1);
     
     for i = 1:length(dicomFiles)
         filePath = fullfile(dicomFiles(i).folder, dicomFiles(i).name);
@@ -171,10 +166,10 @@ function result = checkSliceSpacing(dicomFiles, verbose)
             info = dicominfo(filePath);
             if isfield(info, 'ImagePositionPatient')
                 positions(i, :) = info.ImagePositionPatient';
-                validCount = validCount + 1;
+                isValid(i) = true;
             elseif isfield(info, 'SliceLocation')
                 positions(i, 3) = info.SliceLocation;
-                validCount = validCount + 1;
+                isValid(i) = true;
             end
         catch ME
             if verbose
@@ -184,13 +179,12 @@ function result = checkSliceSpacing(dicomFiles, verbose)
         end
     end
     
-    if validCount < 2
+    validPositions = positions(isValid, :);
+    
+    if size(validPositions, 1) < 2
         result.warnings{end+1} = 'Insufficient valid slices for spacing check';
         return;
     end
-    
-    % Remove invalid positions (all zeros)
-    validPositions = positions(any(positions, 2), :);
     
     % Calculate slice spacings
     [~, sortIdx] = sort(validPositions(:, 3));
@@ -205,7 +199,6 @@ function result = checkSliceSpacing(dicomFiles, verbose)
         
         % Check consistency (std > 10% of mean)
         if result.info.stdSpacing > 0.1 * result.info.meanSpacing
-            result.passed = false;
             result.warnings{end+1} = sprintf(...
                 'Inconsistent slice spacing detected (std=%.3f, mean=%.3f)', ...
                 result.info.stdSpacing, result.info.meanSpacing);

@@ -71,9 +71,9 @@ function test_validationGuards()
         
         result = dwim.ml.validatePreprocessingInput(tempDir, 'Verbose', false);
         
-        % Should detect metadata issues or fail to read
-        assert(~result.valid || ~isempty(result.warnings), ...
-               'Should detect metadata issues or warnings');
+        % Should fail validation due to missing metadata or read errors
+        assert(~result.valid, ...
+               'Should fail validation for files with missing/unreadable metadata');
         
         fprintf('PASSED\n');
     catch ME
