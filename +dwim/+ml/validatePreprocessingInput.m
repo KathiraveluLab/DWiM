@@ -45,7 +45,7 @@ function result = validatePreprocessingInput(inputPath, varargin)
         metadataCheck = checkMetadata(dicomFiles, options.Verbose);
         if ~metadataCheck.passed
             result.valid = false;
-            result.errors = metadataCheck.errors;
+            result.errors = [result.errors, metadataCheck.errors];
         end
     end
     
@@ -150,18 +150,34 @@ function result = checkSliceSpacing(dicomFiles, verbose)
         return;
     end
     
-    positions = zeros(length(dicomFiles), 3);
+    sliceDistances = zeros(length(dicomFiles), 1);
     isValid = false(length(dicomFiles), 1);
+    sliceNormal = [];
+    hasWarned = false;
     
     for i = 1:length(dicomFiles)
         filePath = fullfile(dicomFiles(i).folder, dicomFiles(i).name);
         try
             info = dicominfo(filePath);
             if isfield(info, 'ImagePositionPatient')
-                positions(i, :) = info.ImagePositionPatient';
+                if isempty(sliceNormal) && isfield(info, 'ImageOrientationPatient')
+                    rowVec = info.ImageOrientationPatient(1:3)';
+                    colVec = info.ImageOrientationPatient(4:6)';
+                    sliceNormal = cross(rowVec, colVec);
+                end
+                
+                if ~isempty(sliceNormal)
+                    sliceDistances(i) = dot(info.ImagePositionPatient, sliceNormal);
+                else
+                    if ~hasWarned && verbose
+                        fprintf('WARNING: ImageOrientationPatient not found. Using Z-coordinate for spacing. This may be inaccurate for non-axial series.\n');
+                        hasWarned = true;
+                    end
+                    sliceDistances(i) = info.ImagePositionPatient(3);
+                end
                 isValid(i) = true;
             elseif isfield(info, 'SliceLocation')
-                positions(i, 3) = info.SliceLocation;
+                sliceDistances(i) = info.SliceLocation;
                 isValid(i) = true;
             end
         catch ME
@@ -172,17 +188,15 @@ function result = checkSliceSpacing(dicomFiles, verbose)
         end
     end
     
-    validPositions = positions(isValid, :);
+    validSliceDistances = sliceDistances(isValid);
     
-    if size(validPositions, 1) < 2
+    if length(validSliceDistances) < 2
         result.warnings{end+1} = 'Insufficient valid slices for spacing check';
         return;
     end
     
-    % Calculate slice spacings
-    [~, sortIdx] = sort(validPositions(:, 3));
-    sortedPositions = validPositions(sortIdx, :);
-    spacings = diff(sortedPositions(:, 3));
+    sortedDistances = sort(validSliceDistances);
+    spacings = diff(sortedDistances);
     
     if ~isempty(spacings)
         result.info.meanSpacing = mean(abs(spacings));
@@ -190,7 +204,6 @@ function result = checkSliceSpacing(dicomFiles, verbose)
         result.info.minSpacing = min(abs(spacings));
         result.info.maxSpacing = max(abs(spacings));
         
-        % Check consistency (std > 10% of mean)
         if result.info.stdSpacing > 0.1 * result.info.meanSpacing
             result.warnings{end+1} = sprintf(...
                 'Inconsistent slice spacing detected (std=%.3f, mean=%.3f)', ...
