@@ -32,15 +32,21 @@ function outputFile = scrub(inputFile, outputFolder, profileName, mapper)
 
     % 3. Get Profile Settings
     [updateAttributes, keepAttributes] = dwim.anonymize.getProfile(profileName);
-
-    % --- WEEK 13 UPGRADE: Consistent Remapping ---
-    if ~isempty(mapper)
-        % Peek at the original file to get the real ID
-        meta = dicominfo(char(inputFile));
-        if isfield(meta, 'PatientID')
-            % Ask the mapper for the consistent new ID
-            newPatientID = mapper.getNewId(meta.PatientID, "RES_");
-            updateAttributes.PatientID = newPatientID;
+    
+    % Handles mapped vs random logic centrally to avoid redundant generation
+    if lower(profileName) == "research"
+        if ~isempty(mapper)
+            % Peek at the original file to get the real ID
+            meta = dicominfo(char(inputFile));
+            if isfield(meta, 'PatientID')
+                updateAttributes.PatientID = mapper.getNewId(meta.PatientID, "RES_");
+            else
+                % Fallback if file has no ID
+                updateAttributes.PatientID = ['RES_' char(java.util.UUID.randomUUID)];
+            end
+        else
+            % Fallback: Generate a random ID if no mapper is provided
+            updateAttributes.PatientID = ['RES_' char(java.util.UUID.randomUUID)];
         end
     end
 

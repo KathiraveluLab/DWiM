@@ -22,8 +22,7 @@ classdef UidMapper < handle
             % If we haven't seen this patient before, invent a new ID
             if ~obj.Dictionary.isKey(originalId)
                 rawUuid = char(java.util.UUID.randomUUID);
-                shortHash = rawUuid(1:8); % Grab the first 8 chars to keep it clean
-                obj.Dictionary(originalId) = char(prefix + shortHash);
+                obj.Dictionary(originalId) = char(prefix + rawUuid);
             end
             
             % Return the mapped ID

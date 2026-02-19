@@ -5,12 +5,11 @@ function [updateAttributes, keepAttributes] = getProfile(profileName)
         profileName (1,1) string
     end
 
-    % Default: Keep nothing (let dicomanon remove standard PHI)
+    % Default: Keep nothing
     keepAttributes = {}; 
 
     switch lower(profileName)
         case 'strict'
-            % Strict: Remove everything. 
             updateAttributes = struct();
             updateAttributes.PatientName = 'ANONYMIZED';
             updateAttributes.PatientID = 'ANONYMIZED';
@@ -24,11 +23,8 @@ function [updateAttributes, keepAttributes] = getProfile(profileName)
             % Research: Mask Identity, but KEEP Demographics
             updateAttributes = struct();
             updateAttributes.PatientName = 'RESEARCH_SUB'; 
-            
-            % Use a unique UUID to prevent data merging collisions
-            updateAttributes.PatientID = ['RES_' char(java.util.UUID.randomUUID)];
-            
             updateAttributes.InstitutionName = 'RESEARCH_LAB';
+            % Logic centralized in scrub.m
             
             % Explicitly tell dicomanon NOT to remove these
             keepAttributes = {'PatientAge', 'PatientSex'};
