@@ -142,11 +142,7 @@ end
 
 function hash = computeDataHash(data)
 %COMPUTEDATAHASH Compute MD5 hash of data
-    dataBytes = typecast(data(:), 'uint8');
-    md = java.security.MessageDigest.getInstance('MD5');
-    md.update(dataBytes);
-    hashBytes = md.digest();
-    hash = sprintf('%02x', typecast(hashBytes, 'uint8'));
+    hash = dwim.ml.computeHash(data);
 end
 
 function [trainIdx, valIdx, testIdx] = splitDataset(indices, trainRatio, valRatio, testRatio)

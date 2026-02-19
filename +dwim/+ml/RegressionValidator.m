@@ -97,13 +97,17 @@ classdef RegressionValidator < handle
                 end
             end
             
-            % Check hash
+            % Check hash (only report mismatch if values are out of tolerance)
             currentHash = obj.computeHash(data);
             report.baselineHash = baseline.hash;
             report.currentHash = currentHash;
             
             if ~strcmp(currentHash, baseline.hash)
-                report.errors{end+1} = 'Hash mismatch detected';
+                % Hash mismatch is expected for any difference, but only flag as error
+                % if the difference exceeds tolerance or sizes don't match
+                if ~isfield(report, 'maxDifference') || report.maxDifference > obj.Tolerance
+                    report.errors{end+1} = 'Hash mismatch detected';
+                end
             end
             
             report.passed = isempty(report.errors);
@@ -138,11 +142,7 @@ classdef RegressionValidator < handle
         
         function hash = computeHash(~, data)
             %COMPUTEHASH Compute MD5 hash of data
-            dataBytes = typecast(data(:), 'uint8');
-            md = java.security.MessageDigest.getInstance('MD5');
-            md.update(dataBytes);
-            hashBytes = md.digest();
-            hash = sprintf('%02x', typecast(hashBytes, 'uint8'));
+            hash = dwim.ml.computeHash(data);
         end
     end
 end

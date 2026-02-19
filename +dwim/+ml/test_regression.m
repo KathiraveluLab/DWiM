@@ -36,7 +36,7 @@ function test_regression()
         testData = rand(32, 32, 'single');
         validator.saveBaseline('test_values', testData);
         
-        % Modify data slightly
+        % Modify data slightly beyond tolerance
         modifiedData = testData + 1e-8;
         [isValid, report] = validator.validate('test_values', modifiedData);
         
@@ -48,7 +48,25 @@ function test_regression()
         fprintf('FAILED: %s\n', ME.message);
     end
     
-    % Test 3: Detect size changes
+    % Test 3: Pass with data modified within tolerance
+    fprintf('Test 3: Pass with data modified within tolerance... ');
+    try
+        testData = rand(32, 32, 'single');
+        validator.saveBaseline('test_tolerance_pass', testData);
+        
+        % Modify data by amount smaller than tolerance
+        modifiedData = testData + 1e-12;  % 1e-12 < 1e-10 tolerance
+        [isValid, report] = validator.validate('test_tolerance_pass', modifiedData);
+        
+        assert(isValid, 'Validation should pass for data modified within tolerance');
+        assert(isempty(report.errors), 'Should have no errors for changes within tolerance');
+        
+        fprintf('PASSED\n');
+    catch ME
+        fprintf('FAILED: %s\n', ME.message);
+    end
+    
+    % Test 4: Detect size changes
     fprintf('Test 3: Detect size changes... ');
     try
         testData = rand(50, 50, 'single');
@@ -67,7 +85,7 @@ function test_regression()
         fprintf('FAILED: %s\n', ME.message);
     end
     
-    % Test 4: Detect type changes
+    % Test 5: Detect type changes
     fprintf('Test 4: Detect type changes... ');
     try
         testData = rand(40, 40, 'single');
@@ -86,7 +104,7 @@ function test_regression()
         fprintf('FAILED: %s\n', ME.message);
     end
     
-    % Test 5: Hash consistency
+    % Test 6: Hash consistency
     fprintf('Test 5: Hash consistency... ');
     try
         testData = rand(30, 30, 'single');
@@ -102,7 +120,7 @@ function test_regression()
         fprintf('FAILED: %s\n', ME.message);
     end
     
-    % Test 6: Missing baseline handling
+    % Test 7: Missing baseline handling
     fprintf('Test 6: Missing baseline handling... ');
     try
         testData = rand(20, 20, 'single');
@@ -117,7 +135,7 @@ function test_regression()
         fprintf('FAILED: %s\n', ME.message);
     end
     
-    % Test 7: List baselines
+    % Test 8: List baselines
     fprintf('Test 7: List baselines... ');
     try
         validator.saveBaseline('baseline1', rand(10, 10));
