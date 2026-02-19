@@ -13,7 +13,7 @@ function outputFile = scrub(inputFile, outputFolder, profileName, mapper)
     ANON_SUFFIX = '_anon';
 
     % 1. Safety Check
-    [~, status] = dwim.internal.readDicomSafe(inputFile);
+    [meta, status] = dwim.internal.readDicomSafe(inputFile);
     if ~status.success
         error('DWiM:ReadError', status.message);
     end
@@ -32,20 +32,13 @@ function outputFile = scrub(inputFile, outputFolder, profileName, mapper)
 
     % 3. Get Profile Settings
     [updateAttributes, keepAttributes] = dwim.anonymize.getProfile(profileName);
-    
-    % Handles mapped vs random logic centrally to avoid redundant generation
+
     if lower(profileName) == "research"
-        if ~isempty(mapper)
-            % Peek at the original file to get the real ID
-            meta = dicominfo(char(inputFile));
-            if isfield(meta, 'PatientID')
-                updateAttributes.PatientID = mapper.getNewId(meta.PatientID, "RES_");
-            else
-                % Fallback if file has no ID
-                updateAttributes.PatientID = ['RES_' char(java.util.UUID.randomUUID)];
-            end
+        % Simplified logic and reused the 'meta' struct from Step 1
+        if ~isempty(mapper) && isfield(meta, 'PatientID')
+            updateAttributes.PatientID = mapper.getNewId(meta.PatientID, "RES_");
         else
-            % Fallback: Generate a random ID if no mapper is provided
+            % Generate a random ID if no mapper or no original ID
             updateAttributes.PatientID = ['RES_' char(java.util.UUID.randomUUID)];
         end
     end
