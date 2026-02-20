@@ -67,7 +67,7 @@ function test_regression()
     end
     
     % Test 4: Detect size changes
-    fprintf('Test 3: Detect size changes... ');
+    fprintf('Test 4: Detect size changes... ');
     try
         testData = rand(50, 50, 'single');
         validator.saveBaseline('test_size', testData);
@@ -86,7 +86,7 @@ function test_regression()
     end
     
     % Test 5: Detect type changes
-    fprintf('Test 4: Detect type changes... ');
+    fprintf('Test 5: Detect type changes... ');
     try
         testData = rand(40, 40, 'single');
         validator.saveBaseline('test_type', testData);
@@ -105,7 +105,7 @@ function test_regression()
     end
     
     % Test 6: Hash consistency
-    fprintf('Test 5: Hash consistency... ');
+    fprintf('Test 6: Hash consistency... ');
     try
         testData = rand(30, 30, 'single');
         validator.saveBaseline('test_hash', testData);
@@ -121,7 +121,7 @@ function test_regression()
     end
     
     % Test 7: Missing baseline handling
-    fprintf('Test 6: Missing baseline handling... ');
+    fprintf('Test 7: Missing baseline handling... ');
     try
         testData = rand(20, 20, 'single');
         [isValid, report] = validator.validate('nonexistent_baseline', testData);
@@ -136,7 +136,7 @@ function test_regression()
     end
     
     % Test 8: List baselines
-    fprintf('Test 7: List baselines... ');
+    fprintf('Test 8: List baselines... ');
     try
         validator.saveBaseline('baseline1', rand(10, 10));
         validator.saveBaseline('baseline2', rand(20, 20));

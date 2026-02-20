@@ -10,14 +10,9 @@ function hash = computeHash(data)
 %   Outputs:
 %       hash - MD5 hash string
 
-    % Serialize data to handle all MATLAB data types robustly
-    tempFile = [tempname '.mat'];
-    cleanup = onCleanup(@() delete(tempFile));
-    save(tempFile, 'data', '-v7.3');
-    
-    fid = fopen(tempFile, 'r');
-    dataBytes = fread(fid, inf, '*uint8');
-    fclose(fid);
+    % Serialize data to a byte stream in memory to avoid disk I/O.
+    % Note: getByteStreamFromArray is an undocumented internal MATLAB function.
+    dataBytes = getByteStreamFromArray(data);
     
     md = java.security.MessageDigest.getInstance('MD5');
     md.update(dataBytes);

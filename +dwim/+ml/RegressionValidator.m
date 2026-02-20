@@ -86,8 +86,8 @@ classdef RegressionValidator < handle
                     mat2str(size(baseline.data)), mat2str(size(data)));
             end
             
-            % Check values
-            if isequal(size(data), size(baseline.data))
+            % Check values (only for numeric data)
+            if isequal(size(data), size(baseline.data)) && isnumeric(data) && isnumeric(baseline.data)
                 maxDiff = max(abs(data(:) - baseline.data(:)));
                 report.maxDifference = maxDiff;
                 
@@ -136,6 +136,10 @@ classdef RegressionValidator < handle
     methods (Access = private)
         function filepath = getBaselinePath(obj, testName)
             %GETBASELINEPATH Get full path for baseline file
+            if contains(testName, '..') || contains(testName, '/') || contains(testName, '\')
+                error('RegressionValidator:InvalidTestName', ...
+                      'testName must not contain path separators or traversal characters.');
+            end
             filename = sprintf('%s.mat', testName);
             filepath = fullfile(obj.BaselineDir, filename);
         end
