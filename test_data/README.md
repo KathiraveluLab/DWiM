@@ -9,4 +9,4 @@ You can securely fetch sample data directly via the TCIA API. Navigate to this d
 
 **Using `wget`:**
 ```bash
-wget -O sample_image.dcm "[https://services.cancerimagingarchive.net/nbia-api/services/v1/getImage?SeriesInstanceUID=1.3.6.1.4.1.14519.5.2.1.7009.9004.322361405101076426435467004428](https://services.cancerimagingarchive.net/nbia-api/services/v1/getImage?SeriesInstanceUID=1.3.6.1.4.1.14519.5.2.1.7009.9004.322361405101076426435467004428)"
+wget -O sample_image.dcm 'https://services.cancerimagingarchive.net/nbia-api/services/v1/getImage?SeriesInstanceUID=1.3.6.1.4.1.14519.5.2.1.7009.9004.322361405101076426435467004428'
