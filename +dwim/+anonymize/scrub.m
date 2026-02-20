@@ -1,10 +1,11 @@
-function outputFile = scrub(inputFile, outputFolder, profileName)
-    % SCRUB Removes PHI based on a specific profile.
+function outputFile = scrub(inputFile, outputFolder, profileName, mapper)
+    % SCRUB Removes PHI based on a specific profile, with optional UID remapping.
     
     arguments
         inputFile (1,1) string
         outputFolder (1,1) string = ""
         profileName (1,1) string = "strict"
+        mapper = [] % Optional dwim.anonymize.UidMapper object
     end
 
     % Constants
@@ -12,12 +13,12 @@ function outputFile = scrub(inputFile, outputFolder, profileName)
     ANON_SUFFIX = '_anon';
 
     % 1. Safety Check
-    [~, status] = dwim.internal.readDicomSafe(inputFile);
+    [meta, status] = dwim.internal.readDicomSafe(inputFile);
     if ~status.success
         error('DWiM:ReadError', status.message);
     end
 
-    % 2. Output Path
+    % 2. Determine Output Path
     [p, f, ext] = fileparts(inputFile);
     if outputFolder == ""
         outputFolder = fullfile(p, DEFAULT_SUBFOLDER);
@@ -30,26 +31,30 @@ function outputFile = scrub(inputFile, outputFolder, profileName)
     outputFile = fullfile(outputFolder, filenameStr);
 
     % 3. Get Profile Settings
-    % Now retrieves BOTH the update struct AND the keep list
     [updateAttributes, keepAttributes] = dwim.anonymize.getProfile(profileName);
+
+    if lower(profileName) == "research"
+        % Simplified logic and reused the 'meta' struct from Step 1
+        if ~isempty(mapper) && isfield(meta, 'PatientID')
+            updateAttributes.PatientID = mapper.getNewId(meta.PatientID, "RES_");
+        else
+            % Generate a random ID if no mapper or no original ID
+            updateAttributes.PatientID = ['RES_' char(java.util.UUID.randomUUID)];
+        end
+    end
 
     % 4. Run Anonymization
     try
-        % We check if we have specific tags to keep.
         if isempty(keepAttributes)
-            dicomanon(char(inputFile), char(outputFile), ...
-                'update', updateAttributes);
+            dicomanon(char(inputFile), char(outputFile), 'update', updateAttributes);
         else
-            % Pass the 'keep' argument to protect demographic data
-            dicomanon(char(inputFile), char(outputFile), ...
-                'update', updateAttributes, ...
-                'keep', keepAttributes);
+            dicomanon(char(inputFile), char(outputFile), 'update', updateAttributes, 'keep', keepAttributes);
         end
     catch ME
         error('DWiM:AnonymizeFailed', 'Failed to scrub file "%s": %s', inputFile, ME.message);
     end
     
-    % 5. Verify
+    % 5. Verify Success
     if ~exist(outputFile, 'file')
         error('DWiM:WriteError', 'Anonymization ran but no file was created.');
     end
