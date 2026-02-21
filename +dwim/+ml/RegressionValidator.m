@@ -85,7 +85,8 @@ classdef RegressionValidator < handle
             
             % Check values (only for numeric data)
             if isequal(size(data), size(baseline.data)) && isnumeric(data) && isnumeric(baseline.data)
-                maxDiff = max(abs(data(:) - baseline.data(:)));
+                % Prepending 0 handles the edge case of empty data, where max([]) would return [].
+                maxDiff = max([0; abs(data(:) - baseline.data(:))]);
                 report.maxDifference = maxDiff;
                 
                 if maxDiff > obj.Tolerance

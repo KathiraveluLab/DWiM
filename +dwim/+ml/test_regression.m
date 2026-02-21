@@ -108,5 +108,22 @@
             testCase.verifyGreaterThanOrEqual(numel(baselines), 2, ...
                 'Should list saved baselines');
         end
+
+        function testValidationWithEmptyData(testCase)
+            % Validation with empty data - guards against max([]) crash
+            testData = [];
+            testCase.Validator.saveBaseline('test_empty', testData);
+            [isValid, report] = testCase.Validator.validate('test_empty', testData);
+            testCase.verifyTrue(isValid, 'Validation should pass for identical empty data');
+            testCase.verifyEmpty(report.errors, 'Should have no errors for empty data');
+
+            % Empty data against a non-empty baseline should fail with size mismatch
+            testCase.Validator.saveBaseline('test_non_empty', rand(10, 10));
+            [isValid_mismatch, report_mismatch] = testCase.Validator.validate('test_non_empty', []);
+            testCase.verifyFalse(isValid_mismatch, ...
+                'Validation should fail for size mismatch with empty data');
+            testCase.verifyTrue(any(contains(report_mismatch.errors, 'Size mismatch')), ...
+                'Should report size mismatch');
+        end
     end
 end
