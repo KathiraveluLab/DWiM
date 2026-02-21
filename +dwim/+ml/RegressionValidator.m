@@ -19,12 +19,9 @@ classdef RegressionValidator < handle
             %REGRESSIONVALIDATOR Construct validator
             %   validator = RegressionValidator(baselineDir)
             %   validator = RegressionValidator(baselineDir, tolerance)
-            
-            if nargin < 1
-                baselineDir = fullfile(pwd, 'baselines');
-            end
-            if nargin < 2
-                tolerance = 1e-10;
+            arguments
+                baselineDir (1,1) string = fullfile(pwd, 'baselines')
+                tolerance (1,1) double {mustBeNonnegative} = 1e-10
             end
             
             obj.BaselineDir = baselineDir;
@@ -102,12 +99,10 @@ classdef RegressionValidator < handle
             report.baselineHash = baseline.hash;
             report.currentHash = currentHash;
             
-            if ~strcmp(currentHash, baseline.hash)
-                % Hash mismatch is expected for any difference, but only flag as error
-                % if the difference exceeds tolerance or sizes don't match
-                if ~isfield(report, 'maxDifference') || report.maxDifference > obj.Tolerance
-                    report.errors{end+1} = 'Hash mismatch detected';
-                end
+            if ~strcmp(currentHash, baseline.hash) && ~isnumeric(data) && isempty(report.errors)
+                % For non-numeric data where value comparison is not performed,
+                % a hash mismatch is a primary indicator of change.
+                report.errors{end+1} = 'Hash mismatch detected for non-numeric data';
             end
             
             report.passed = isempty(report.errors);
@@ -125,11 +120,12 @@ classdef RegressionValidator < handle
         function baselines = listBaselines(obj)
             %LISTBASELINES List all available baselines
             files = dir(fullfile(obj.BaselineDir, '*.mat'));
-            baselines = cell(length(files), 1);
-            for i = 1:length(files)
-                [~, name, ~] = fileparts(files(i).name);
-                baselines{i} = name;
+            if isempty(files)
+                baselines = {};
+                return;
             end
+            [~, names, ~] = fileparts({files.name});
+            baselines = names';
         end
     end
     
