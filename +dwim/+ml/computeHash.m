@@ -10,34 +10,24 @@ function hash = computeHash(data)
 %   Outputs:
 %       hash - MD5 hash string
 
-    % Serialize data to a byte stream via a temporary file.
-    % This avoids reliance on undocumented internal functions like
-    % getByteStreamFromArray, which may be removed in future MATLAB releases.
-    tmpFile = [tempname, '.mat'];
-    cleanup = onCleanup(@() delete(tmpFile));
-    save(tmpFile, 'data', '-v7');
-
-    fid = fopen(tmpFile, 'r');
-    if fid == -1
-        error('dwim:ml:computeHash:FileError', ...
-              'Failed to open temporary file for hashing.');
-    end
-
-    % Skip the 128-byte MAT-file header which contains a 'Created on'
-    % timestamp. Without this, the hash is non-deterministic across runs.
-    fseek(fid, 128, 'bof');
-
-    % Hash in 1 MB chunks to avoid OOM errors on large datasets.
-    md = java.security.MessageDigest.getInstance('MD5');
-    chunkSize = 1024 * 1024;  % 1 MB
-    while ~feof(fid)
-        chunk = fread(fid, chunkSize, '*uint8');
-        if ~isempty(chunk)
-            md.update(chunk);
+    % Use getByteStreamFromArray for robust, deterministic, in-memory
+    % serialization of any MATLAB variable. This avoids the 2GB limit of
+    % save(...,'-v7'), MAT-file header timestamp non-determinism, and the
+    % HDF5 incompatibility with the 128-byte skip trick used by '-v7.3'.
+    try
+        bytes = getByteStreamFromArray(data);
+    catch ME
+        if strcmp(ME.identifier, 'MATLAB:undefinedVarOrFun')
+            error('dwim:ml:computeHash:Unsupported', ...
+                  'getByteStreamFromArray is not available. A different robust serialization method is required.');
+        else
+            rethrow(ME);
         end
     end
-    fclose(fid);
 
+    % Hash the byte stream using MD5.
+    md = java.security.MessageDigest.getInstance('MD5');
+    md.update(bytes);
     hashBytes = md.digest();
     hash = sprintf('%02x', typecast(hashBytes, 'uint8'));
 end
