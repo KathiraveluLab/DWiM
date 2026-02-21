@@ -78,7 +78,7 @@ classdef test_deterministic < matlab.unittest.TestCase
         function result = preprocessTestData(data)
             %PREPROCESSTESTDATA Simple preprocessing for testing
             result = double(data);
-            result = (result - mean(result(:))) / std(result(:));
+            result = (result - mean(result(:))) / (std(result(:)) + eps);
         end
 
         function normalized = normalizeData(data)

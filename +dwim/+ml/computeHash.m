@@ -16,12 +16,28 @@ function hash = computeHash(data)
     tmpFile = [tempname, '.mat'];
     cleanup = onCleanup(@() delete(tmpFile));
     save(tmpFile, 'data', '-v7');
+
     fid = fopen(tmpFile, 'r');
-    dataBytes = fread(fid, '*uint8');
+    if fid == -1
+        error('dwim:ml:computeHash:FileError', ...
+              'Failed to open temporary file for hashing.');
+    end
+
+    % Skip the 128-byte MAT-file header which contains a 'Created on'
+    % timestamp. Without this, the hash is non-deterministic across runs.
+    fseek(fid, 128, 'bof');
+
+    % Hash in 1 MB chunks to avoid OOM errors on large datasets.
+    md = java.security.MessageDigest.getInstance('MD5');
+    chunkSize = 1024 * 1024;  % 1 MB
+    while ~feof(fid)
+        chunk = fread(fid, chunkSize, '*uint8');
+        if ~isempty(chunk)
+            md.update(chunk);
+        end
+    end
     fclose(fid);
 
-    md = java.security.MessageDigest.getInstance('MD5');
-    md.update(dataBytes);
     hashBytes = md.digest();
     hash = sprintf('%02x', typecast(hashBytes, 'uint8'));
 end
