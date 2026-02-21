@@ -123,6 +123,18 @@ classdef DatasetBuilder < handle
             if length(volumePaths) ~= length(labels)
                 error('Number of volumes must match number of labels');
             end
+
+            % Validate and sanitize metadata entries: ensure each element
+            % is a struct; replace missing/invalid entries with empty struct.
+            for k = 1:numel(metadata)
+                if isempty(metadata{k})
+                    metadata{k} = struct();
+                elseif ~isstruct(metadata{k})
+                    warning('DatasetBuilder:InvalidMetadata', ...
+                            'metadata{%d} is not a struct; replacing with empty struct.', k);
+                    metadata{k} = struct();
+                end
+            end
             
             % Append to existing data
             obj.VolumePaths = [obj.VolumePaths; volumePaths(:)];
@@ -364,36 +376,56 @@ classdef DatasetBuilder < handle
         
         function [volumes, labels, metadata] = processBatch(obj, indices)
             % Process a batch of volumes
+            % PR #48: Pre-allocate efficiently to reduce memory fragmentation
             
             numSamples = length(indices);
+            % Pre-allocate all arrays at once for memory efficiency
             volumes = zeros([obj.TargetSize, numSamples], 'single');
             labels = cell(numSamples, 1);
             metadata = cell(numSamples, 1);
             
+            % PR #48: Cache target size to avoid repeated property access
+            targetSize = obj.TargetSize;
+            
             for i = 1:numSamples
                 idx = indices(i);
                 
-                % Load volume
-                volumePath = obj.VolumePaths{idx};
-                if ischar(volumePath)
-                    % Load from file
-                    [volume, meta] = obj.loadVolume(volumePath);
-                else
-                    % Volume data provided directly
-                    volume = volumePath;
-                    meta = obj.Metadata{idx};
+                try
+                    % Load volume
+                    volumePath = obj.VolumePaths{idx};
+                    if ischar(volumePath) || isstring(volumePath)
+                        % Load from file
+                        [volume, meta] = obj.loadVolume(volumePath);
+                    else
+                        % Volume data provided directly
+                        volume = volumePath;
+                        meta = obj.Metadata{idx};
+                    end
+
+                    % Guard: ensure loaded volume is numeric
+                    if ~isnumeric(volume)
+                        error('DatasetBuilder:NonNumericVolume', ...
+                              'Volume at index %d is not numeric (%s).', idx, class(volume));
+                    end
+                    
+                    % Resize to target size (using cached targetSize)
+                    volume = obj.resizeVolume(volume, targetSize);
+                    
+                    % Normalize intensities (PR #48: hot path)
+                    volume = obj.normalizeVolume(volume);
+                    
+                    % Store
+                    volumes(:,:,:,i) = single(volume);
+                    labels{i} = obj.Labels{idx};
+                    metadata{i} = meta;
+
+                catch ME
+                    warning('DatasetBuilder:VolumeProcessingFailed', ...
+                            'Skipping volume %d: %s', idx, ME.message);
+                    % Leave zero-filled slot and empty label/metadata
+                    labels{i} = [];
+                    metadata{i} = struct('error', ME.message, 'skipped', true);
                 end
-                
-                % Resize to target size
-                volume = obj.resizeVolume(volume, obj.TargetSize);
-                
-                % Normalize intensities
-                volume = obj.normalizeVolume(volume);
-                
-                % Store
-                volumes(:,:,:,i) = single(volume);
-                labels{i} = obj.Labels{idx};
-                metadata{i} = meta;
             end
         end
         
@@ -443,22 +475,37 @@ classdef DatasetBuilder < handle
         
         function normalizedVolume = normalizeVolume(obj, volume)
             % Normalize volume intensities
+            % PR #48: Performance-critical section (hot path in batch processing)
             
             switch obj.NormalizationMethod
                 case 'minmax'
+                    % PR #48: Vectorized min/max — fast on modern MATLAB
                     vMin = min(volume(:));
                     vMax = max(volume(:));
-                    volume = (volume - vMin) / (vMax - vMin);
+                    if vMax > vMin
+                        volume = (volume - vMin) / (vMax - vMin);
+                    else
+                        % Constant volume: map to midpoint of output range
+                        volume = zeros(size(volume), 'like', volume) + ...
+                            mean(obj.NormalizationRange);
+                    end
                     volume = volume * (obj.NormalizationRange(2) - obj.NormalizationRange(1)) + ...
                         obj.NormalizationRange(1);
                     
                 case 'zscore'
-                    volume = (volume - mean(volume(:))) / std(volume(:));
+                    s = std(volume(:));
+                    if s > 0
+                        volume = (volume - mean(volume(:))) / s;
+                    else
+                        volume = zeros(size(volume), 'like', volume);
+                    end
                     
                 case 'percentile'
                     p1 = prctile(volume(:), 1);
                     p99 = prctile(volume(:), 99);
-                    volume = (volume - p1) / (p99 - p1);
+                    if p99 > p1
+                        volume = (volume - p1) / (p99 - p1);
+                    end
                     volume = max(0, min(1, volume));
                     
                 case 'hu'

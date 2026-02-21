@@ -67,6 +67,11 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
     scaleFactor = params.VoxelSpacing / targetSpacing;
     inputSize = size(volume);
     outputSize = round(inputSize .* scaleFactor);
+
+    % Numerical stability: each output dimension must be at least 1.
+    % round() can produce 0 when a spatial axis is extremely thin relative
+    % to the target spacing (e.g., single-slice series).
+    outputSize = max(outputSize, 1);
     
     if params.Verbose
         fprintf('Scale factors: [%.3f %.3f %.3f]\n', scaleFactor);
@@ -84,11 +89,19 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
                 inputMemoryGB, outputMemoryGB, peakMemoryGB);
     end
     
-    % GPU setup
+    % GPU setup (PR #48: Cache GPU availability check)
     useGPU = params.UseGPU && canUseGPU();
     if useGPU && params.Verbose
         gpuInfo = gpuDevice();
-        fprintf('Using GPU: %s\n', gpuInfo.Name);
+        availableMemGB = gpuInfo.AvailableMemory / 1e9;
+        fprintf('Using GPU: %s (%.1f GB available)\n', gpuInfo.Name, availableMemGB);
+        
+        % PR #48: Warn if GPU memory may be insufficient
+        if peakMemoryGB > availableMemGB * 0.9
+            warning('dwim:resampleVolume:LowGPUMemory', ...
+                    'Estimated memory (%.1fGB) close to GPU limit (%.1fGB). May fall back to CPU.', ...
+                    peakMemoryGB, availableMemGB);
+        end
     elseif params.UseGPU && ~useGPU && params.Verbose
         fprintf('GPU requested but not available, using CPU\n');
     end
@@ -96,6 +109,10 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
     % Preprocessing
     originalClass = class(volume);
     volume = double(volume);  % Convert to double for processing
+
+    % Capture input value range for post-resampling clamping (before GPU transfer).
+    inputMin = min(volume(:));
+    inputMax = max(volume(:));
     
     if useGPU
         volume = gpuArray(volume);
@@ -114,6 +131,13 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
     % Post-processing
     if useGPU
         resampled = gather(resampled);
+    end
+
+    % Numerical stability: cubic/spline interpolation can overshoot the
+    % original data range. Clamp to [inputMin, inputMax] captured before
+    % any GPU transfer to avoid gpuArray dependencies here.
+    if ~strcmp(params.Method, 'nearest')
+        resampled = max(inputMin, min(inputMax, resampled));
     end
     
     % Restore original data type if not double

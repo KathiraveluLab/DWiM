@@ -25,14 +25,34 @@ function normalized = normalizeHU(image, windowCenter, windowWidth)
         windowWidth (1,1) {mustBeNumeric, mustBePositive}
     end
     
+    % Preserve input precision — single-precision arrays stay single for
+    % memory efficiency in ML pipelines; all others promote to double.
+    inputClass = class(image);
+    if strcmp(inputClass, 'single')
+        targetClass = 'single';
+    else
+        targetClass = 'double';
+    end
+
     % Calculate window bounds
     minHU = windowCenter - (windowWidth / 2);
     maxHU = windowCenter + (windowWidth / 2);
     
     % Apply windowing
     normalized = double(image);
+
+    % Replace non-finite values (NaN, Inf, -Inf) with the lower window bound
+    % so they map to 0 after normalization rather than producing NaN output.
+    nonFiniteMask = ~isfinite(normalized);
+    if any(nonFiniteMask(:))
+        normalized(nonFiniteMask) = minHU;
+    end
+
     normalized = (normalized - minHU) / (maxHU - minHU);
     
     % Clip to [0, 1] range
     normalized = max(0, min(1, normalized));
+
+    % Cast back to input precision
+    normalized = cast(normalized, targetClass);
 end
