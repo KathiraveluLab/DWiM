@@ -1,18 +1,27 @@
 classdef TestPixelData < matlab.unittest.TestCase
     methods(Test)
         function testPixelExtraction(testCase)
-            testFileDir = fileparts(mfilename('fullpath'));
-            projectRoot = fileparts(testFileDir);
-            testFile = fullfile(projectRoot, 'test_data', 'image01.dcm');
+            % 1. Setup: Create a temporary dummy DICOM file
+            tempDir = tempname;
+            mkdir(tempDir);
             
-            img = dwim.readPixels(testFile);
+            testCase.addTeardown(@() rmdir(tempDir, 's'));
             
-            % 1. Standard structural assertions
+            tempDicomPath = fullfile(tempDir, 'dummy_test_image.dcm');
+            
+            % Create a fake 10x10 image
+            dummyImg = uint8(zeros(10, 10));
+            dicomwrite(dummyImg, tempDicomPath);
+            
+            % 2. Run pixel extraction
+            img = dwim.readPixels(tempDicomPath);
+            
+            % 3. Standard structural assertions
             testCase.verifyTrue(isnumeric(img), 'Pixel data should be numeric.');
             testCase.verifyEqual(ndims(img), 2, 'Should be a 2D image.');
             
-            % 2. Bot Fix: Robust value verification
-            % Since our image01.dcm is a dummy 10x10 uint8(zeros), 
+            % 4. Robust value verification
+            % Since our image is a dummy 10x10 uint8(zeros), 
             % we verify the intensity range after scaling.
             testCase.verifyGreaterThanOrEqual(min(img(:)), -2000, 'Intensity below expected medical range.');
             testCase.verifyLessThanOrEqual(max(img(:)), 4000, 'Intensity above expected medical range.');
