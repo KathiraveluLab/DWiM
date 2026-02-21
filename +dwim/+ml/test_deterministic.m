@@ -92,12 +92,31 @@ classdef test_deterministic < matlab.unittest.TestCase
             end
         end
 
-        function [trainIdx, valIdx, testIdx] = splitDataset(indices, trainRatio, valRatio, testRatio)
+        function [trainIdx, valIdx, testIdx] = splitDataset(indices, trainRatio, valRatio, ~)
             %SPLITDATASET Split dataset indices into train/val/test sets
+            %   testRatio is unused; the test set is the remainder.
+            arguments
+                indices (1,:) {mustBeNumeric}
+                trainRatio (1,1) {mustBeInRange(trainRatio, 0, 1)}
+                valRatio (1,1) {mustBeInRange(valRatio, 0, 1)}
+                ~ % testRatio unused; test set is the remainder
+            end
+
+            if trainRatio + valRatio > 1
+                error('dwim:test:splitDataset:InvalidRatios', ...
+                      'The sum of trainRatio and valRatio cannot exceed 1.');
+            end
+
             n = length(indices);
             shuffled = indices(randperm(n));
             nTrain = round(n * trainRatio);
             nVal = round(n * valRatio);
+
+            % Guard against index overflow caused by rounding
+            if nTrain + nVal > n
+                nVal = n - nTrain;
+            end
+
             trainIdx = shuffled(1:nTrain);
             valIdx = shuffled(nTrain+1:nTrain+nVal);
             testIdx = shuffled(nTrain+nVal+1:end);

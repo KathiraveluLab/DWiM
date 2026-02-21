@@ -36,9 +36,11 @@ classdef RegressionValidator < handle
             %SAVEBASELINE Save baseline output for test
             %   saveBaseline(testName, data)
             %   saveBaseline(testName, data, metadata)
-            
-            if nargin < 4
-                metadata = struct();
+            arguments
+                obj (1,1) dwim.ml.RegressionValidator
+                testName (1,1) string
+                data
+                metadata (1,1) struct = struct()
             end
             
             baseline = struct();
