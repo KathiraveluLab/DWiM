@@ -167,7 +167,7 @@ function result = checkSliceSpacing(dicomFiles, verbose)
                 end
                 
                 if ~isempty(sliceNormal)
-                    sliceDistances(i) = dot(info.ImagePositionPatient, sliceNormal');
+                    sliceDistances(i) = dot(info.ImagePositionPatient, sliceNormal);
                 else
                     if ~hasWarned && verbose
                         fprintf('WARNING: ImageOrientationPatient not found. Using Z-coordinate for spacing. This may be inaccurate for non-axial series.\n');
