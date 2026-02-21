@@ -1,13 +1,13 @@
+% tests/test_extractMetadata.m
 
-% Path: C:\Users\surya\DWiM\tests\test_extractMetadata.m
-
-%% Test 1: Functional Metadata Extraction
 fprintf('Running Test 1: Metadata Extraction...\n');
 
-% 1. DYNAMIC DATA GENERATION (Replaces the deleted hardcoded image)
-% Create a temporary directory and file path
+% 1. DYNAMIC DATA GENERATION
 tempDir = tempname;
 mkdir(tempDir);
+
+cleanupObj = onCleanup(@() rmdir(tempDir, 's')); 
+
 tempDicomPath = fullfile(tempDir, 'dummy_test_image.dcm');
 
 % Create a fake 10x10 image with basic metadata
@@ -26,11 +26,6 @@ try
     
 catch ME
     fprintf('ERROR in dwim.extractMetadata: %s\n', ME.message);
-    % Clean up before re-throwing so we don't leave orphaned files
-    rmdir(tempDir, 's');
     rethrow(ME); 
 end
-
-% 4. CLEANUP
-% Remove the temporary folder and dummy file after the test finishes
-rmdir(tempDir, 's');
+% Note: We don't need manual rmdir() anymore because cleanupObj handles it automatically!
