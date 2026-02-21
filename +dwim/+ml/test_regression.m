@@ -1,4 +1,4 @@
-﻿classdef test_regression < matlab.unittest.TestCase
+classdef test_regression < matlab.unittest.TestCase
 %TEST_REGRESSION Unit tests for RegressionValidator
 %
 %   Run with: results = runtests('test_regression'); table(results)

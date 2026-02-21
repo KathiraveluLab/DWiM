@@ -1,4 +1,4 @@
-﻿classdef test_deterministic < matlab.unittest.TestCase
+classdef test_deterministic < matlab.unittest.TestCase
 %TEST_DETERMINISTIC Unit tests for deterministic ML preprocessing behavior
 %
 %   Validates that the same input produces the same output across multiple runs.

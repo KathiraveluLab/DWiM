@@ -83,28 +83,29 @@ classdef RegressionValidator < handle
                     mat2str(size(baseline.data)), mat2str(size(data)));
             end
             
-            % Check values (only for numeric data)
-            if isequal(size(data), size(baseline.data)) && isnumeric(data) && isnumeric(baseline.data)
-                % Prepending 0 handles the edge case of empty data, where max([]) would return [].
-                maxDiff = max([0; abs(data(:) - baseline.data(:))]);
-                report.maxDifference = maxDiff;
-                
-                if maxDiff > obj.Tolerance
-                    report.errors{end+1} = sprintf('Value difference %.2e exceeds tolerance %.2e', ...
-                        maxDiff, obj.Tolerance);
+            currentHash = obj.computeHash(data);
+            if isempty(report.errors)
+                if isnumeric(data) && isnumeric(baseline.data)
+                    % For numeric data, check values against tolerance.
+                    % Prepending 0 handles empty arrays where max([]) would return [].
+                    maxDiff = max([0; abs(data(:) - baseline.data(:))]);
+                    report.maxDifference = maxDiff;
+
+                    if maxDiff > obj.Tolerance
+                        report.errors{end+1} = sprintf('Value difference %.2e exceeds tolerance %.2e', ...
+                            maxDiff, obj.Tolerance);
+                    end
+                else
+                    % For non-numeric data, a hash mismatch is the primary indicator of change.
+                    if ~strcmp(currentHash, baseline.hash)
+                        report.errors{end+1} = 'Hash mismatch detected for non-numeric data';
+                    end
                 end
             end
-            
-            % Check hash (only report mismatch if values are out of tolerance)
-            currentHash = obj.computeHash(data);
+
+            % Always populate hash fields for diagnostics
             report.baselineHash = baseline.hash;
             report.currentHash = currentHash;
-            
-            if ~strcmp(currentHash, baseline.hash) && ~isnumeric(data) && isempty(report.errors)
-                % For non-numeric data where value comparison is not performed,
-                % a hash mismatch is a primary indicator of change.
-                report.errors{end+1} = 'Hash mismatch detected for non-numeric data';
-            end
             
             report.passed = isempty(report.errors);
             isValid = report.passed;
