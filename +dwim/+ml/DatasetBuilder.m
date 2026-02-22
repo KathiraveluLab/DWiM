@@ -493,8 +493,8 @@ classdef DatasetBuilder < handle
             switch obj.NormalizationMethod
                 case 'minmax'
                     % PR #48: Vectorized min/max — fast on modern MATLAB
-                    vMin = min(volume(:));
-                    vMax = max(volume(:));
+                    vMin = min(volume(:), 'omitnan');
+                    vMax = max(volume(:), 'omitnan');
                     if vMax > vMin
                         volume = (volume - vMin) / (vMax - vMin);
                     else
@@ -506,9 +506,9 @@ classdef DatasetBuilder < handle
                         obj.NormalizationRange(1);
                     
                 case 'zscore'
-                    s = std(volume(:));
+                    s = std(volume(:), 'omitnan');
                     if s > 0
-                        volume = (volume - mean(volume(:))) / s;
+                        volume = (volume - mean(volume(:), 'omitnan')) / s;
                     else
                         volume = zeros(size(volume), 'like', volume);
                     end

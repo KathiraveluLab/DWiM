@@ -147,7 +147,7 @@ function [output, metadata] = preprocessPipeline(input, config)
 
         if config.continueOnError
             try
-                [data, stepMetadata] = applyProcessingStep(data, stepName, config);
+                [data, stepMetadata] = applyProcessingStep(data, stepName, config, metadata);
                 metadata.(stepName) = stepMetadata;
                 metadata.steps{end+1} = stepName;
                 metadata.stepTimings.(stepName) = toc(stepTimer);
@@ -160,7 +160,7 @@ function [output, metadata] = preprocessPipeline(input, config)
                 if config.verbose, fprintf('SKIPPED (error: %s)\n', ME.message); end
             end
         else
-            [data, stepMetadata] = applyProcessingStep(data, stepName, config);
+            [data, stepMetadata] = applyProcessingStep(data, stepName, config, metadata);
             metadata.(stepName) = stepMetadata;
             metadata.steps{end+1} = stepName;
             metadata.stepTimings.(stepName) = toc(stepTimer);
@@ -257,7 +257,7 @@ function [data, metadata] = processInput(input, config)
     metadata.processedSize = size(data);
 end
 
-function [output, metadata] = applyProcessingStep(data, stepName, config)
+function [output, metadata] = applyProcessingStep(data, stepName, config, pipelineMetadata)
 %APPLYPROCESSINGSTEP Apply individual processing step
 
     metadata = struct('step', stepName, 'startTime', datetime('now'));
@@ -314,10 +314,23 @@ function [output, metadata] = applyProcessingStep(data, stepName, config)
 
         case 'resample'
             if ndims(data) == 3
+                % Extract voxel spacing from pipeline metadata
+                if isfield(pipelineMetadata, 'input') && isfield(pipelineMetadata.input, 'spacing')
+                    voxelSpacing = pipelineMetadata.input.spacing;
+                elseif isfield(params, 'voxelSpacing')
+                    voxelSpacing = params.voxelSpacing;
+                else
+                    voxelSpacing = [1.0 1.0 1.0];  % Fallback default
+                    warning('dwim:preprocessPipeline:NoSpacingInfo', ...
+                            'No voxel spacing information available. Using default [1 1 1] mm.');
+                end
+                
                 [output, resampleMeta] = dwim.preprocess3d.resampleVolume(data, ...
+                    'VoxelSpacing', voxelSpacing, ...
                     'TargetSpacing', params.targetSpacing, 'Verbose', false);
                 metadata.resampleMetadata = resampleMeta;
                 metadata.targetSpacing = params.targetSpacing;
+                metadata.inputSpacing = voxelSpacing;
             else
                 output = data;
                 metadata.skipped = true;
