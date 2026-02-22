@@ -56,6 +56,12 @@ classdef PerformanceBenchmark < handle
                 obj   (1,1) dwim.ml.PerformanceBenchmark
                 label (1,1) string
             end
+            if isempty(obj.ActiveTimer)
+                warning('PerformanceBenchmark:StopWithoutStart', ...
+                        'stop(''%s'') called without a running timer.', label);
+                return;
+            end
+            
             elapsed = toc(obj.ActiveTimer);
             memDelta = PerformanceBenchmark.currentMemoryMB() - obj.ActiveMemMB;
 

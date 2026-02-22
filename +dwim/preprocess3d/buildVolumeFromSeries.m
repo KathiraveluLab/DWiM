@@ -248,7 +248,7 @@ function [volume, assemblyInfo] = assembleRawVolume(sortedMetadata, verbose)
     dataType = class(firstSlice);
     
     % Memory estimation
-    bytesPerElement = getDataTypeSize(dataType);
+    bytesPerElement = dwim.utils.getDataTypeSize(dataType);
     estimatedMB = (rows * cols * numSlices * bytesPerElement) / (1024^2);
     
     if verbose
@@ -381,20 +381,5 @@ function metadata = generateBuildMetadata(dicomPath, params, dicomFiles, sortedM
         if isfield(firstInfo, 'Modality')
             metadata.modality = firstInfo.Modality;
         end
-    end
-end
-function bytes = getDataTypeSize(dataType)
-%GETDATATYPESIZE Get size in bytes for MATLAB data type
-    switch dataType
-        case {'int8', 'uint8'}
-            bytes = 1;
-        case {'int16', 'uint16'}
-            bytes = 2;
-        case {'int32', 'uint32', 'single'}
-            bytes = 4;
-        case {'int64', 'uint64', 'double'}
-            bytes = 8;
-        otherwise
-            bytes = 8;  % Conservative fallback
     end
 end

@@ -124,6 +124,19 @@ classdef DatasetBuilder < handle
                 error('Number of volumes must match number of labels');
             end
 
+            % Pad or truncate metadata to match volumePaths length
+            if numel(metadata) ~= numel(volumePaths)
+                warning('DatasetBuilder:MismatchedMetadataCount', ...
+                    'Number of metadata entries (%d) does not match number of volumes (%d). Adjusting metadata count.', ...
+                    numel(metadata), numel(volumePaths));
+                new_metadata = cell(size(volumePaths));
+                n_to_copy = min(numel(metadata), numel(volumePaths));
+                if n_to_copy > 0
+                    new_metadata(1:n_to_copy) = metadata(1:n_to_copy);
+                end
+                metadata = new_metadata;
+            end
+
             % Validate and sanitize metadata entries: ensure each element
             % is a struct; replace missing/invalid entries with empty struct.
             for k = 1:numel(metadata)

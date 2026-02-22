@@ -197,13 +197,13 @@ function sortedInfo = sortSlices(fileInfo, sortBy, verbose)
                 warning('dwim:assembleVolume:MissingSliceLocation', ...
                         '%d/%d slices missing SliceLocation. Falling back to InstanceNumber.', ...
                         sum(~validMask), numel(validMask));
-                sortBy = 'InstanceNumber';  % Fallback
-                [~, sortIdx] = sort([fileInfo.instanceNumber]);
+                sortedInfo = sortSlices(fileInfo, 'InstanceNumber', verbose);
+                return;
             elseif numel(unique(locations)) == 1 && length(locations) > 1
                 warning('dwim:assembleVolume:AmbiguousSort', ...
                         'All slice locations are identical. Falling back to InstanceNumber.');
-                sortBy = 'InstanceNumber';
-                [~, sortIdx] = sort([fileInfo.instanceNumber]);
+                sortedInfo = sortSlices(fileInfo, 'InstanceNumber', verbose);
+                return;
             else
                 [~, sortIdx] = sort(locations);
             end
@@ -278,7 +278,7 @@ function [volume, assemblyInfo] = assembleVolumeData(sortedInfo, params)
     
     % Memory estimation and warning
     dataType = class(firstImage);
-    bytesPerElement = getDataTypeSize(dataType);
+    bytesPerElement = dwim.utils.getDataTypeSize(dataType);
     estimatedMB = (rows * cols * numSlices * bytesPerElement) / (1024^2);
     
     if estimatedMB > 1000  % Warn if > 1 GB
@@ -404,20 +404,4 @@ function metadata = generateAssemblyMetadata(sortedInfo, assemblyInfo, params, M
     end
     
     metadata.assemblyParams = params;
-end
-
-function bytes = getDataTypeSize(dataType)
-%GETDATATYPESIZE Get size in bytes for MATLAB data type
-    switch dataType
-        case {'int8', 'uint8'}
-            bytes = 1;
-        case {'int16', 'uint16'}
-            bytes = 2;
-        case {'int32', 'uint32', 'single'}
-            bytes = 4;
-        case {'int64', 'uint64', 'double'}
-            bytes = 8;
-        otherwise
-            bytes = 8;  % Conservative fallback
-    end
 end

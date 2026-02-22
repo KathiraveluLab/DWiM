@@ -113,8 +113,7 @@ function [output, metadata] = preprocessPipeline(input, config)
 
     % Dry run: validate steps and return without processing
     if strcmp(config.executionMode, 'dry_run')
-        knownSteps = {'assemble','orient','resample','window','normalize', ...
-                      'validate','validate_volume'};
+        knownSteps = getKnownSteps();
         unknownSteps = setdiff(config.steps, knownSteps);
         if ~isempty(unknownSteps)
             warning('dwim:preprocessPipeline:UnknownSteps', ...
@@ -386,4 +385,10 @@ function printSummaryReport(metadata, config)
     end
     fprintf('  Total time:   %.2f s\n', metadata.totalTime);
     fprintf('===================================\n');
+end
+
+function knownSteps = getKnownSteps()
+%GETKNOWNSTEPS Return list of valid processing steps
+    knownSteps = {'assemble','orient','resample','window','normalize', ...
+                  'validate','validate_volume'};
 end
