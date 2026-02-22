@@ -47,7 +47,7 @@ classdef test_datasetBuilder_edgeCases < matlab.unittest.TestCase
             vol2 = tc.SmallVol * 0.5;
             tc.verifyWarning( ...
                 @() db.addVolumes({tc.SmallVol, vol2}, {struct()}), ...
-                'DatasetBuilder:InvalidMetadata');
+                'DatasetBuilder:MismatchedMetadataCount');
         end
 
         function testAddVolumesMixedValidInvalidMetadata(tc)

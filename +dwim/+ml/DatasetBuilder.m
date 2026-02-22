@@ -518,6 +518,9 @@ classdef DatasetBuilder < handle
                     p99 = prctile(volume(:), 99);
                     if p99 > p1
                         volume = (volume - p1) / (p99 - p1);
+                    else
+                        % For constant or near-constant volumes, map to the midpoint
+                        volume = zeros(size(volume), 'like', volume) + 0.5;
                     end
                     volume = max(0, min(1, volume));
                     
