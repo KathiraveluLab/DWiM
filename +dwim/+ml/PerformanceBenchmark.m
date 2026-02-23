@@ -71,6 +71,7 @@ classdef PerformanceBenchmark < handle
                         label, obj.ActiveLabel);
             end
             obj.ActiveLabel = '';
+            obj.ActiveTimer = [];
             obj.record(label, elapsed, memDelta);
         end
 

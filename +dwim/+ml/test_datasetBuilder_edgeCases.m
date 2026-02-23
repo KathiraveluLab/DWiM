@@ -158,7 +158,7 @@ classdef test_datasetBuilder_edgeCases < matlab.unittest.TestCase
         function testBuildWithEmptyDataset(tc)
             db = dwim.ml.DatasetBuilder();
             % Build on empty dataset should throw an error
-            tc.verifyError(@() db.build(), '?');
+            tc.verifyError(@() db.build(), 'dwim:DatasetBuilder:NoVolumes');
         end
 
         function testSplitRatiosSumToOne(tc)

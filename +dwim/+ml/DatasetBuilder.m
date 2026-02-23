@@ -189,7 +189,8 @@ classdef DatasetBuilder < handle
             fprintf('========================================\n\n');
             
             if obj.NumVolumes == 0
-                error('No volumes added to dataset. Use addVolumes() first.');
+                error('dwim:DatasetBuilder:NoVolumes', ...
+                    'No volumes added to dataset. Use addVolumes() first.');
             end
             
             % Step 1: Create directory structure
@@ -436,7 +437,7 @@ classdef DatasetBuilder < handle
                     warning('DatasetBuilder:VolumeProcessingFailed', ...
                             'Skipping volume %d: %s', idx, ME.message);
                     % Leave zero-filled slot and empty label/metadata
-                    labels{i} = [];
+                    labels{i} = '';
                     metadata{i} = struct('error', ME.message, 'skipped', true);
                 end
             end
@@ -505,9 +506,10 @@ classdef DatasetBuilder < handle
                         obj.NormalizationRange(1);
                     
                 case 'zscore'
+                    m = mean(volume(:), 'omitnan');
                     s = std(volume(:), 'omitnan');
                     if s > 0
-                        volume = (volume - mean(volume(:), 'omitnan')) / s;
+                        volume = (volume - m) / s;
                     else
                         volume = zeros(size(volume), 'like', volume);
                     end
