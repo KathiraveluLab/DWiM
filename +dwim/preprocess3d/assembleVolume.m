@@ -182,7 +182,7 @@ function fileInfo = readAllMetadata(dicomFiles, verbose)
 end
 
 function sortedInfo = sortSlices(fileInfo, sortBy, verbose)
-%SORTSLICES Sort slices by specified method
+%SORTSLICES Sort slices by specified method with robust fallback logic
     if verbose
         fprintf('Sorting slices by %s...\n', sortBy);
     end
@@ -190,13 +190,38 @@ function sortedInfo = sortSlices(fileInfo, sortBy, verbose)
     switch sortBy
         case 'SliceLocation'
             locations = [fileInfo.sliceLocation];
-            if numel(unique(locations)) == 1 && length(locations) > 1
+            
+            % Check for missing or invalid slice locations
+            validMask = ~isnan(locations) & isfinite(locations);
+            if ~all(validMask)
+                warning('dwim:assembleVolume:MissingSliceLocation', ...
+                        '%d/%d slices missing SliceLocation. Falling back to InstanceNumber.', ...
+                        sum(~validMask), numel(validMask));
+                sortedInfo = sortSlices(fileInfo, 'InstanceNumber', verbose);
+                return;
+            elseif numel(unique(locations)) == 1 && length(locations) > 1
                 warning('dwim:assembleVolume:AmbiguousSort', ...
-                        'All slice locations are identical. Sorting by SliceLocation may result in an incorrect volume order. Consider using ''InstanceNumber''.');
+                        'All slice locations are identical. Falling back to InstanceNumber.');
+                sortedInfo = sortSlices(fileInfo, 'InstanceNumber', verbose);
+                return;
+            else
+                [~, sortIdx] = sort(locations);
             end
-            [~, sortIdx] = sort(locations);
+            
         case 'InstanceNumber'
-            [~, sortIdx] = sort([fileInfo.instanceNumber]);
+            instanceNumbers = [fileInfo.instanceNumber];
+            
+            % Check for missing instance numbers
+            validMask = ~isnan(instanceNumbers) & isfinite(instanceNumbers);
+            if ~all(validMask)
+                warning('dwim:assembleVolume:MissingInstanceNumber', ...
+                        '%d/%d slices missing InstanceNumber. Using file order.', ...
+                        sum(~validMask), numel(validMask));
+                sortIdx = 1:length(fileInfo);  % Fallback to file order
+            else
+                [~, sortIdx] = sort(instanceNumbers);
+            end
+            
         otherwise
             error('dwim:assembleVolume:InvalidSortMethod', 'Invalid sort method: %s', sortBy);
     end
@@ -204,8 +229,12 @@ function sortedInfo = sortSlices(fileInfo, sortBy, verbose)
     sortedInfo = fileInfo(sortIdx);
     
     if verbose
-        fprintf('Slices sorted from %.2f to %.2f\n', ...
-                sortedInfo(1).sliceLocation, sortedInfo(end).sliceLocation);
+        if ~isnan(sortedInfo(1).sliceLocation) && ~isnan(sortedInfo(end).sliceLocation)
+            fprintf('Slices sorted from %.2f to %.2f (method: %s)\n', ...
+                    sortedInfo(1).sliceLocation, sortedInfo(end).sliceLocation, sortBy);
+        else
+            fprintf('Slices sorted (method: %s)\n', sortBy);
+        end
     end
 end
 
@@ -247,8 +276,23 @@ function [volume, assemblyInfo] = assembleVolumeData(sortedInfo, params)
     firstImage = dicomread(sortedInfo(1).info);
     [rows, cols] = size(firstImage);
     
-    % Initialize volume
-    volume = zeros(rows, cols, numSlices, class(firstImage));
+    % Memory estimation and warning
+    dataType = class(firstImage);
+    bytesPerElement = dwim.utils.getDataTypeSize(dataType);
+    estimatedMB = (rows * cols * numSlices * bytesPerElement) / (1024^2);
+    
+    if estimatedMB > 1000  % Warn if > 1 GB
+        warning('dwim:assembleVolume:LargeVolume', ...
+                'Assembling large volume: %.1f MB. Consider processing in chunks if memory issues occur.', ...
+                estimatedMB);
+    end
+    
+    if params.Verbose
+        fprintf('Estimated memory: %.1f MB\n', estimatedMB);
+    end
+    
+    % Initialize volume (pre-allocation for memory efficiency)
+    volume = zeros(rows, cols, numSlices, dataType);
     
     if params.Verbose
         fprintf('Assembling volume: [%d %d %d]\n', rows, cols, numSlices);

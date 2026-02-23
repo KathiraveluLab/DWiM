@@ -234,7 +234,7 @@ function sortedMetadata = sortSlicesByPosition(fileMetadata, verbose)
 end
 
 function [volume, assemblyInfo] = assembleRawVolume(sortedMetadata, verbose)
-%ASSEMBLERAWVOLUME Assemble the 3D volume from sorted slices
+%ASSEMBLERAWVOLUME Assemble the 3D volume from sorted slices with memory optimization
 
     numSlices = length(sortedMetadata);
 
@@ -242,12 +242,27 @@ function [volume, assemblyInfo] = assembleRawVolume(sortedMetadata, verbose)
         fprintf('Assembling volume from %d slices...\n', numSlices);
     end
 
-    % Read first slice to get dimensions
+    % Read first slice to get dimensions and data type
     firstSlice = dicomread(sortedMetadata(1).info);
     [rows, cols] = size(firstSlice);
+    dataType = class(firstSlice);
+    
+    % Memory estimation
+    bytesPerElement = dwim.utils.getDataTypeSize(dataType);
+    estimatedMB = (rows * cols * numSlices * bytesPerElement) / (1024^2);
+    
+    if verbose
+        fprintf('Estimated memory: %.1f MB\n', estimatedMB);
+    end
+    
+    if estimatedMB > 2000  % Warn if > 2 GB
+        warning('dwim:buildVolumeFromSeries:LargeVolume', ...
+                'Assembling very large volume (%.1f MB). Memory issues may occur.', ...
+                estimatedMB);
+    end
 
-    % Initialize volume
-    volume = zeros(rows, cols, numSlices, class(firstSlice));
+    % Pre-allocate volume for memory efficiency
+    volume = zeros(rows, cols, numSlices, dataType);
 
     % Read all slices
     for i = 1:numSlices

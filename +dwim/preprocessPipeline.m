@@ -7,33 +7,40 @@ function [output, metadata] = preprocessPipeline(input, config)
 %   Inputs:
 %       input - Input data (filepath, directory path, or array)
 %       config - Configuration structure with fields:
-%                .inputType - 'filepath', 'dicomdir', 'image', 'volume'
-%                .outputType - 'image', 'volume'
-%                .steps - Cell array of processing steps
-%                .parameters - Structure with step-specific parameters
-%                .validation - Validation settings
-%                .verbose - Display progress (default: true)
+%                .inputType      - 'filepath', 'dicomdir', 'image', 'volume'
+%                .outputType     - 'image', 'volume'
+%                .steps          - Cell array of processing steps
+%                .parameters     - Structure with step-specific parameters
+%                .validation     - Validation settings
+%                .executionMode  - 'strict' (default), 'lenient', 'dry_run'
+%                .continueOnError- Keep going after step failure (lenient only)
+%                .verbose        - Display progress (default: true)
 %
-%   Outputs:
-%       output - Processed image or volume
-%       metadata - Structure with processing information
+%   Execution Modes:
+%       'strict'   - Any step failure raises an error (default)
+%       'lenient'  - Step failures are logged as warnings; pipeline continues
+%       'dry_run'  - Validates config/steps without executing any processing
 %
 %   Processing Steps:
-%       'assemble' - Assemble 3D volume from DICOM series
-%       'orient' - Correct anatomical orientation
-%       'resample' - Resample to isotropic spacing
-%       'window' - Apply windowing preset
-%       'normalize' - Normalize HU values
-%       'validate' - Validate 2D image for ML
+%       'assemble'        - Assemble 3D volume from DICOM series
+%       'orient'          - Correct anatomical orientation
+%       'resample'        - Resample to isotropic spacing
+%       'window'          - Apply windowing preset
+%       'normalize'       - Normalize HU values
+%       'validate'        - Validate 2D image for ML
 %       'validate_volume' - Validate 3D volume for ML
 %
 %   Example:
-%       % DICOM folder to ML-ready volume
+%       % DICOM folder to ML-ready volume (strict mode)
 %       config = struct();
 %       config.inputType = 'dicomdir';
 %       config.steps = {'assemble', 'orient', 'resample'};
 %       config.parameters.orient.targetOrientation = 'RAS';
 %       config.parameters.resample.targetSpacing = 1.0;
+%       [volume, metadata] = dwim.preprocessPipeline('dicom_folder/', config);
+%
+%       % Lenient mode — continue on step failure
+%       config.executionMode = 'lenient';
 %       [volume, metadata] = dwim.preprocessPipeline('dicom_folder/', config);
 
     arguments
@@ -61,6 +68,20 @@ function [output, metadata] = preprocessPipeline(input, config)
     if ~isfield(config, 'verbose')
         config.verbose = true;
     end
+
+    if ~isfield(config, 'executionMode')
+        config.executionMode = 'strict';
+    end
+
+    validModes = {'strict', 'lenient', 'dry_run'};
+    if ~ismember(config.executionMode, validModes)
+        error('dwim:preprocessPipeline:InvalidMode', ...
+              'executionMode must be one of: strict, lenient, dry_run');
+    end
+
+    if ~isfield(config, 'continueOnError')
+        config.continueOnError = strcmp(config.executionMode, 'lenient');
+    end
     
     % Initialize metadata and timing
     pipelineTimer = tic;
@@ -68,12 +89,46 @@ function [output, metadata] = preprocessPipeline(input, config)
     metadata.startTime = datetime('now');
     metadata.config = config;
     metadata.steps = {};
+    metadata.stepTimings = struct();
+    metadata.stepErrors = struct();
+    metadata.success = false;
+    
+    % PR #48: Track memory usage for profiling
+    try
+        memInfo = memory();
+        metadata.memoryStart = memInfo.MemUsedMATLAB / 1e6;  % MB
+    catch
+        metadata.memoryStart = 0;  % memory() not available on all platforms
+    end
 
     if config.verbose
         fprintf('DWiM Unified Preprocessing Pipeline\n');
         fprintf('===================================\n');
-        fprintf('Input type: %s\n', config.inputType);
-        fprintf('Steps: %s\n', strjoin(config.steps, ' → '));
+        fprintf('Input type:      %s\n', config.inputType);
+        fprintf('Execution mode:  %s\n', config.executionMode);
+        if ~isempty(config.steps)
+            fprintf('Steps:           %s\n', strjoin(config.steps, ' → '));
+        end
+    end
+
+    % Dry run: validate steps and return without processing
+    if strcmp(config.executionMode, 'dry_run')
+        knownSteps = getKnownSteps();
+        unknownSteps = setdiff(config.steps, knownSteps);
+        if ~isempty(unknownSteps)
+            warning('dwim:preprocessPipeline:UnknownSteps', ...
+                    'Unknown steps in dry_run: %s', strjoin(unknownSteps, ', '));
+        end
+        if config.verbose
+            fprintf('[DRY RUN] Config validated. %d steps defined. No processing performed.\n', ...
+                    numel(config.steps));
+        end
+        output = [];
+        metadata.dryRun = true;
+        metadata.success = true;
+        metadata.totalTime = toc(pipelineTimer);
+        metadata.endTime = datetime('now');
+        return;
     end
 
     % Step 1: Input processing
@@ -84,14 +139,33 @@ function [output, metadata] = preprocessPipeline(input, config)
     % Step 2: Apply preprocessing steps
     for i = 1:length(config.steps)
         stepName = config.steps{i};
+        stepTimer = tic;
 
         if config.verbose
-            fprintf('Step %d/%d: %s\n', i, length(config.steps), stepName);
+            fprintf('Step %d/%d: %s ... ', i, length(config.steps), stepName);
         end
 
-        [data, stepMetadata] = applyProcessingStep(data, stepName, config);
-        metadata.(stepName) = stepMetadata;
-        metadata.steps{end+1} = stepName;
+        if config.continueOnError
+            try
+                [data, stepMetadata] = applyProcessingStep(data, stepName, config, metadata);
+                metadata.(stepName) = stepMetadata;
+                metadata.steps{end+1} = stepName;
+                metadata.stepTimings.(stepName) = toc(stepTimer);
+                if config.verbose, fprintf('done (%.2fs)\n', metadata.stepTimings.(stepName)); end
+            catch ME
+                metadata.stepErrors.(stepName) = ME.message;
+                metadata.stepTimings.(stepName) = toc(stepTimer);
+                warning('dwim:preprocessPipeline:StepFailed', ...
+                        'Step ''%s'' failed (skipped): %s', stepName, ME.message);
+                if config.verbose, fprintf('SKIPPED (error: %s)\n', ME.message); end
+            end
+        else
+            [data, stepMetadata] = applyProcessingStep(data, stepName, config, metadata);
+            metadata.(stepName) = stepMetadata;
+            metadata.steps{end+1} = stepName;
+            metadata.stepTimings.(stepName) = toc(stepTimer);
+            if config.verbose, fprintf('done (%.2fs)\n', metadata.stepTimings.(stepName)); end
+        end
     end
 
     % Step 3: Final validation
@@ -106,12 +180,22 @@ function [output, metadata] = preprocessPipeline(input, config)
     metadata.totalTime = toc(pipelineTimer);
     metadata.endTime = datetime('now');
     metadata.success = true;
+    metadata.failedSteps = fieldnames(metadata.stepErrors);
+    
+    % PR #48: Track peak memory usage
+    try
+        memInfo = memory();
+        metadata.memoryEnd = memInfo.MemUsedMATLAB / 1e6;  % MB
+        metadata.memoryDelta = metadata.memoryEnd - metadata.memoryStart;
+    catch
+        metadata.memoryEnd = 0;
+        metadata.memoryDelta = 0;
+    end
 
     output = data;
 
     if config.verbose
-        fprintf('Pipeline completed in %.2f seconds\n', metadata.totalTime);
-        fprintf('===================================\n');
+        printSummaryReport(metadata, config);
     end
 end
 
@@ -173,7 +257,7 @@ function [data, metadata] = processInput(input, config)
     metadata.processedSize = size(data);
 end
 
-function [output, metadata] = applyProcessingStep(data, stepName, config)
+function [output, metadata] = applyProcessingStep(data, stepName, config, pipelineMetadata)
 %APPLYPROCESSINGSTEP Apply individual processing step
 
     metadata = struct('step', stepName, 'startTime', datetime('now'));
@@ -230,10 +314,23 @@ function [output, metadata] = applyProcessingStep(data, stepName, config)
 
         case 'resample'
             if ndims(data) == 3
+                % Extract voxel spacing from pipeline metadata
+                if isfield(pipelineMetadata, 'input') && isfield(pipelineMetadata.input, 'spacing')
+                    voxelSpacing = pipelineMetadata.input.spacing;
+                elseif isfield(params, 'voxelSpacing')
+                    voxelSpacing = params.voxelSpacing;
+                else
+                    voxelSpacing = [1.0 1.0 1.0];  % Fallback default
+                    warning('dwim:preprocessPipeline:NoSpacingInfo', ...
+                            'No voxel spacing information available. Using default [1 1 1] mm.');
+                end
+                
                 [output, resampleMeta] = dwim.preprocess3d.resampleVolume(data, ...
+                    'VoxelSpacing', voxelSpacing, ...
                     'TargetSpacing', params.targetSpacing, 'Verbose', false);
                 metadata.resampleMetadata = resampleMeta;
                 metadata.targetSpacing = params.targetSpacing;
+                metadata.inputSpacing = voxelSpacing;
             else
                 output = data;
                 metadata.skipped = true;
@@ -283,4 +380,28 @@ function image = loadImageFromFile(filepath)
         error('dwim:preprocessPipeline:UnsupportedFileType', ...
               'Unsupported file type: %s', filepath);
     end
+end
+
+function printSummaryReport(metadata, config)
+%PRINTSUMMARYREPORT Print a concise execution summary to the console
+    fprintf('===================================\n');
+    fprintf('Pipeline Summary\n');
+    fprintf('  Mode:         %s\n', config.executionMode);
+    fprintf('  Steps run:    %d\n', numel(metadata.steps) - 1);  % exclude 'input'
+    nFailed = numel(fieldnames(metadata.stepErrors));
+    if nFailed > 0
+        failed = strjoin(fieldnames(metadata.stepErrors), ', ');
+        fprintf('  Steps failed: %d (%s)\n', nFailed, failed);
+    end
+    if isfield(metadata, 'validation') && metadata.validation.performed
+        fprintf('  Validation:   %s\n', mat2str(metadata.validation.isValid));
+    end
+    fprintf('  Total time:   %.2f s\n', metadata.totalTime);
+    fprintf('===================================\n');
+end
+
+function knownSteps = getKnownSteps()
+%GETKNOWNSTEPS Return list of valid processing steps
+    knownSteps = {'assemble','orient','resample','window','normalize', ...
+                  'validate','validate_volume'};
 end

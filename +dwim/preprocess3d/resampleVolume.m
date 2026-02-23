@@ -67,6 +67,11 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
     scaleFactor = params.VoxelSpacing / targetSpacing;
     inputSize = size(volume);
     outputSize = round(inputSize .* scaleFactor);
+
+    % Numerical stability: each output dimension must be at least 1.
+    % round() can produce 0 when a spatial axis is extremely thin relative
+    % to the target spacing (e.g., single-slice series).
+    outputSize = max(outputSize, 1);
     
     if params.Verbose
         fprintf('Scale factors: [%.3f %.3f %.3f]\n', scaleFactor);
@@ -76,26 +81,43 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
     % Memory management assessment
     volumeInfo = whos('volume');
     inputMemoryGB = volumeInfo.bytes / 1e9;
-    outputMemoryGB = prod(outputSize) * 8 / 1e9;  % Output will be double
-    peakMemoryGB = inputMemoryGB + outputMemoryGB + inputMemoryGB;  % Input + Output + Double copy
+    % Memory estimate based on input type (preserve single precision)
+    bytesPerElement = volumeInfo.bytes / numel(volume);
+    outputMemoryGB = prod(outputSize) * bytesPerElement / 1e9;
+    peakMemoryGB = inputMemoryGB + outputMemoryGB;
     
     if params.Verbose
         fprintf('Memory estimate: Input=%.1fGB, Output=%.1fGB, Peak=%.1fGB\n', ...
                 inputMemoryGB, outputMemoryGB, peakMemoryGB);
     end
     
-    % GPU setup
+    % GPU setup (PR #48: Cache GPU availability check)
     useGPU = params.UseGPU && canUseGPU();
     if useGPU && params.Verbose
         gpuInfo = gpuDevice();
-        fprintf('Using GPU: %s\n', gpuInfo.Name);
+        availableMemGB = gpuInfo.AvailableMemory / 1e9;
+        fprintf('Using GPU: %s (%.1f GB available)\n', gpuInfo.Name, availableMemGB);
+        
+        % PR #48: Warn if GPU memory may be insufficient
+        if peakMemoryGB > availableMemGB * 0.9
+            warning('dwim:resampleVolume:LowGPUMemory', ...
+                    'Estimated memory (%.1fGB) close to GPU limit (%.1fGB). May fall back to CPU.', ...
+                    peakMemoryGB, availableMemGB);
+        end
     elseif params.UseGPU && ~useGPU && params.Verbose
         fprintf('GPU requested but not available, using CPU\n');
     end
     
-    % Preprocessing
+    % Preprocessing - preserve single precision to avoid 2x memory spike
     originalClass = class(volume);
-    volume = double(volume);  % Convert to double for processing
+    % Only convert to double if input is integer type; preserve single/double
+    if ~isa(volume, 'single') && ~isa(volume, 'double')
+        volume = double(volume);
+    end
+
+    % Capture input value range for post-resampling clamping (before GPU transfer)
+    inputMin = min(volume(:));
+    inputMax = max(volume(:));
     
     if useGPU
         volume = gpuArray(volume);
@@ -114,6 +136,13 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
     % Post-processing
     if useGPU
         resampled = gather(resampled);
+    end
+
+    % Numerical stability: cubic/spline interpolation can overshoot the
+    % original data range. Clamp to [inputMin, inputMax] captured before
+    % any GPU transfer to avoid gpuArray dependencies here.
+    if ~strcmp(params.Method, 'nearest')
+        resampled = max(inputMin, min(inputMax, resampled));
     end
     
     % Restore original data type if not double
