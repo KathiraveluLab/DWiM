@@ -23,6 +23,7 @@ function bytes = getDataTypeSize(dataType)
         case {'int64', 'uint64', 'double'}
             bytes = 8;
         otherwise
-            bytes = 8;  % Conservative fallback
+            error('dwim:utils:UnsupportedDataType', ...
+                'Unsupported data type: %s', dataType);
     end
 end
