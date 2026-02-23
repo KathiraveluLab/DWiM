@@ -81,8 +81,10 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
     % Memory management assessment
     volumeInfo = whos('volume');
     inputMemoryGB = volumeInfo.bytes / 1e9;
-    outputMemoryGB = prod(outputSize) * 8 / 1e9;  % Output will be double
-    peakMemoryGB = inputMemoryGB + outputMemoryGB + inputMemoryGB;  % Input + Output + Double copy
+    % Memory estimate based on input type (preserve single precision)
+    bytesPerElement = volumeInfo.bytes / numel(volume);
+    outputMemoryGB = prod(outputSize) * bytesPerElement / 1e9;
+    peakMemoryGB = inputMemoryGB + outputMemoryGB;
     
     if params.Verbose
         fprintf('Memory estimate: Input=%.1fGB, Output=%.1fGB, Peak=%.1fGB\n', ...
@@ -106,11 +108,14 @@ function [resampled, metadata] = resampleVolume(volume, varargin)
         fprintf('GPU requested but not available, using CPU\n');
     end
     
-    % Preprocessing
+    % Preprocessing - preserve single precision to avoid 2x memory spike
     originalClass = class(volume);
-    volume = double(volume);  % Convert to double for processing
+    % Only convert to double if input is integer type; preserve single/double
+    if ~isa(volume, 'single') && ~isa(volume, 'double')
+        volume = double(volume);
+    end
 
-    % Capture input value range for post-resampling clamping (before GPU transfer).
+    % Capture input value range for post-resampling clamping (before GPU transfer)
     inputMin = min(volume(:));
     inputMax = max(volume(:));
     

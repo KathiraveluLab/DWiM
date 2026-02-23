@@ -38,8 +38,8 @@ function normalized = normalizeHU(image, windowCenter, windowWidth)
     minHU = windowCenter - (windowWidth / 2);
     maxHU = windowCenter + (windowWidth / 2);
     
-    % Apply windowing
-    normalized = double(image);
+    % Apply windowing - preserve precision to avoid unnecessary memory doubling
+    normalized = cast(image, targetClass);
 
     % Replace non-finite values (NaN, Inf, -Inf) with the lower window bound
     % so they map to 0 after normalization rather than producing NaN output.
