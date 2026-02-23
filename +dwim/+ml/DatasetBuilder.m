@@ -498,9 +498,8 @@ classdef DatasetBuilder < handle
                     if vMax > vMin
                         volume = (volume - vMin) / (vMax - vMin);
                     else
-                        % Constant volume: map to midpoint of output range
-                        volume = zeros(size(volume), 'like', volume) + ...
-                            mean(obj.NormalizationRange);
+                        % Constant volume: map to midpoint [0,1] before scaling
+                        volume = zeros(size(volume), 'like', volume) + 0.5;
                     end
                     volume = volume * (obj.NormalizationRange(2) - obj.NormalizationRange(1)) + ...
                         obj.NormalizationRange(1);
