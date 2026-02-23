@@ -70,7 +70,7 @@ classdef test_pipeline_stress < matlab.unittest.TestCase
             config.windowCenter = 40;
             config.windowWidth  = 400;
             % Invalid spacing triggers an error in the resample step
-            config.pixelSpacing = [0 0 0];  % deliberately bad
+            config.parameters.resample.voxelSpacing = [0 0 0];  % deliberately bad
 
             % Should complete without throwing even with bad spacing
             tc.verifyWarningFree( ...
@@ -85,7 +85,7 @@ classdef test_pipeline_stress < matlab.unittest.TestCase
             config.executionMode  = 'lenient';
             config.continueOnError = true;
             config.modality       = 'CT';
-            config.pixelSpacing   = [0 0 0];  % triggers resample error
+            config.parameters.resample.voxelSpacing = [0 0 0];  % triggers resample error
 
             [~, meta] = dwim.preprocessPipeline(vol, config);
 
@@ -102,12 +102,12 @@ classdef test_pipeline_stress < matlab.unittest.TestCase
             config = struct();
             config.executionMode = 'strict';
             config.modality      = 'CT';
-            config.pixelSpacing  = [0 0 0];  % bad spacing
+            config.parameters.resample.voxelSpacing = [0 0 0];  % bad spacing
 
             % strict mode should propagate the error
             tc.verifyError( ...
                 @() dwim.preprocessPipeline(vol, config), ...
-                '?');
+                'dwim:resampleVolume:InvalidVoxelSpacing');
         end
     end
 

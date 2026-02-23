@@ -137,8 +137,8 @@ classdef test_datasetBuilder_edgeCases < matlab.unittest.TestCase
             emptyMeta = struct('id', 'empty');
             db.addVolumes({goodVol, emptyVol, goodVol}, ...
                            {goodMeta,  emptyMeta,  goodMeta});
-            % Build should complete without error even if one volume fails
-            tc.verifyWarningFree(@() db.build());
+            % Build should issue warning for corrupted volume but continue
+            tc.verifyWarning(@() db.build(), 'DatasetBuilder:VolumeProcessingFailed');
             ds = db.getDataset('train');
             % At least the good volumes should produce output
             tc.verifyNotEmpty(ds);
@@ -157,8 +157,8 @@ classdef test_datasetBuilder_edgeCases < matlab.unittest.TestCase
 
         function testBuildWithEmptyDataset(tc)
             db = dwim.ml.DatasetBuilder();
-            % Build on empty dataset should warn or be a no-op, not crash
-            tc.verifyWarningFree(@() db.build());
+            % Build on empty dataset should throw an error
+            tc.verifyError(@() db.build(), '?');
         end
 
         function testSplitRatiosSumToOne(tc)
