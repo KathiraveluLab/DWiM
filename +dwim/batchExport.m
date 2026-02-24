@@ -19,7 +19,7 @@ function T = batchExport(folderPath)
     
     fprintf('Batch processing %d files...\n', numFiles);
     
-    % 2. Process each file (BOT FIX: Reintroduced parfor for parallel processing)
+    % 2. Process each file using parallel workers
     parfor i = 1:numFiles
         filePath = fullfile(files(i).folder, files(i).name);
         try
@@ -34,10 +34,18 @@ function T = batchExport(folderPath)
     % 3. Clean up any failed extractions
     metaList = metaList(~cellfun('isempty', metaList));
     
+    % Safety check: Did all files fail?
+    if isempty(metaList)
+        warning('DWiM:AllExtractionsFailed', 'No valid metadata could be extracted.');
+        T = table();
+        return;
+    end
+    
     % 4. Aggregate into a unified MATLAB Table
     try
         
-        allFields = unique(vertcat(cellfun(@fieldnames, metaList, 'UniformOutput', false)));
+        tempFields = cellfun(@fieldnames, metaList, 'UniformOutput', false);
+        allFields = unique(vertcat(tempFields{:}));
         
         % Pad each struct with missing fields and guarantee identical field order
         for k = 1:length(metaList)
