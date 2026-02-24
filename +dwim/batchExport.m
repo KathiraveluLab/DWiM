@@ -19,12 +19,11 @@ function T = batchExport(folderPath)
     
     fprintf('Batch processing %d files...\n', numFiles);
     
-    % 2. Process each file 
-    for i = 1:numFiles
+    % 2. Process each file (BOT FIX: Reintroduced parfor for parallel processing)
+    parfor i = 1:numFiles
         filePath = fullfile(files(i).folder, files(i).name);
         try
-
-            % Assign directly without redundant parsing.
+            % extractMetadata already performs recursive flattening
             metaStruct = dwim.extractMetadata(filePath);
             metaList{i} = metaStruct;
         catch ME
@@ -36,14 +35,9 @@ function T = batchExport(folderPath)
     metaList = metaList(~cellfun('isempty', metaList));
     
     % 4. Aggregate into a unified MATLAB Table
-    
     try
-        % Find all unique field names across all structs
-        allFields = {};
-        for k = 1:length(metaList)
-            allFields = [allFields; fieldnames(metaList{k})];
-        end
-        allFields = unique(allFields);
+        
+        allFields = unique(vertcat(cellfun(@fieldnames, metaList, 'UniformOutput', false)));
         
         % Pad each struct with missing fields and guarantee identical field order
         for k = 1:length(metaList)
