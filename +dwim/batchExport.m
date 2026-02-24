@@ -20,15 +20,13 @@ function T = batchExport(folderPath)
     fprintf('Batch processing %d files...\n', numFiles);
     
     % 2. Process each file 
-    % (Note: This is the standard loop. We will upgrade this in GSoC!)
     for i = 1:numFiles
         filePath = fullfile(files(i).folder, files(i).name);
         try
-            % Extract metadata using your existing engine
+
+            % Assign directly without redundant parsing.
             metaStruct = dwim.extractMetadata(filePath);
-            
-            % Flatten nested structs to ensure clean table generation
-            metaList{i} = flattenStruct(metaStruct);
+            metaList{i} = metaStruct;
         catch ME
             warning('DWiM:ExtractionFailed', 'Failed to process %s: %s', files(i).name, ME.message);
         end
@@ -38,7 +36,26 @@ function T = batchExport(folderPath)
     metaList = metaList(~cellfun('isempty', metaList));
     
     % 4. Aggregate into a unified MATLAB Table
+    
     try
+        % Find all unique field names across all structs
+        allFields = {};
+        for k = 1:length(metaList)
+            allFields = [allFields; fieldnames(metaList{k})];
+        end
+        allFields = unique(allFields);
+        
+        % Pad each struct with missing fields and guarantee identical field order
+        for k = 1:length(metaList)
+            missingFields = setdiff(allFields, fieldnames(metaList{k}));
+            for m = 1:length(missingFields)
+                metaList{k}.(missingFields{m}) = missing; 
+            end
+            % Order fields identically to prevent horizontal concatenation errors
+            metaList{k} = orderfields(metaList{k}, allFields);
+        end
+        
+        % Safely concatenate now that structure blueprints are identical
         combinedStruct = [metaList{:}];
         T = struct2table(combinedStruct, 'AsArray', true);
     catch ME
@@ -46,38 +63,4 @@ function T = batchExport(folderPath)
     end
     
     fprintf('Batch export complete! Aggregated %d records.\n', height(T));
-end
-
-% --- Helper Function ---
-function flatStruct = flattenStruct(inStruct, prefix)
-    % Recursively flattens nested structures into a single-level struct.
-    if nargin < 2
-        prefix = '';
-    end
-    flatStruct = struct();
-    fields = fieldnames(inStruct);
-    
-    for i = 1:length(fields)
-        fName = fields{i};
-        val = inStruct.(fName);
-        
-        % Create new field name (append prefix if nested)
-        if ~isempty(prefix)
-            newFName = [prefix, '_', fName];
-        else
-            newFName = fName;
-        end
-        
-        if isstruct(val)
-            % Recursive call for nested structs
-            subStruct = flattenStruct(val, newFName);
-            subFields = fieldnames(subStruct);
-            for j = 1:length(subFields)
-                flatStruct.(subFields{j}) = subStruct.(subFields{j});
-            end
-        else
-            % Assign flat value
-            flatStruct.(newFName) = val;
-        end
-    end
 end
