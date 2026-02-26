@@ -1,37 +1,68 @@
-function T = batchExport(inputFolder)
+function T = batchExport(folderPath)
+    % BATCHEXPORT Scans a directory for DICOM files, extracts metadata,
+    % and aggregates it into a single flattened MATLAB table.
+    
     arguments
-        inputFolder (1,1) string = ""
+        folderPath (1,1) string
     end
-
-    % Path Discovery
-    if inputFolder == ""
-        packagePath = fileparts(mfilename('fullpath'));
-        projectRoot = fileparts(packagePath);
-        inputFolder = fullfile(projectRoot, 'test_data');
+    
+    % 1. Find all DICOM files in the directory
+    files = dir(fullfile(folderPath, '*.dcm'));
+    if isempty(files)
+        warning('DWiM:NoFiles', 'No .dcm files found in %s', folderPath);
+        T = table();
+        return;
     end
-
-    files = dir(fullfile(inputFolder, '*.dcm'));
-    numFiles = numel(files);
-    allMetadata = cell(numFiles, 1);
-
-    % Performance Optimization: Parallel Loop
+    
+    numFiles = length(files);
+    metaList = cell(numFiles, 1);
+    
+    fprintf('Batch processing %d files...\n', numFiles);
+    
+    % 2. Process each file using parallel workers
     parfor i = 1:numFiles
-        currentFile = fullfile(files(i).folder, files(i).name);
+        filePath = fullfile(files(i).folder, files(i).name);
         try
-            allMetadata{i} = dwim.extractMetadata(currentFile);
+            % extractMetadata already performs recursive flattening
+            metaStruct = dwim.extractMetadata(filePath);
+            metaList{i} = metaStruct;
         catch ME
-            warning('DWiM:BatchWarning', 'Skipping %s: %s', files(i).name, ME.message);
-            allMetadata{i} = struct(); 
+            warning('DWiM:ExtractionFailed', 'Failed to process %s: %s', files(i).name, ME.message);
         end
     end
-
-    % Convert to Table (Safe handling of diverse fields)
-    % Filter out any empty entries before conversion
-    validEntries = allMetadata(~cellfun(@isempty, allMetadata));
-    if isempty(validEntries)
+    
+    % 3. Clean up any failed extractions
+    metaList = metaList(~cellfun('isempty', metaList));
+    
+    % Safety check: Did all files fail?
+    if isempty(metaList)
+        warning('DWiM:AllExtractionsFailed', 'No valid metadata could be extracted.');
         T = table();
-    else
-        % Convert cell of structs to a struct array for struct2table
-        T = struct2table([validEntries{:}], 'AsArray', true);
+        return;
     end
+    
+    % 4. Aggregate into a unified MATLAB Table
+    try
+        
+        tempFields = cellfun(@fieldnames, metaList, 'UniformOutput', false);
+        allFields = unique(vertcat(tempFields{:}));
+        
+        % Pad each struct with missing fields and guarantee identical field order
+        for k = 1:length(metaList)
+            missingFields = setdiff(allFields, fieldnames(metaList{k}));
+            for m = 1:length(missingFields)
+                metaList{k}.(missingFields{m}) = missing; 
+            end
+            % Order fields identically to prevent horizontal concatenation errors
+            metaList{k} = orderfields(metaList{k}, allFields);
+        end
+        
+        % Safely concatenate now that structure blueprints are identical
+        combinedStruct = [metaList{:}];
+        T = struct2table(combinedStruct, 'AsArray', true);
+    catch ME
+        error('DWiM:TableConversionFailed', 'Failed to aggregate batch data into a table: %s', ME.message);
+    end
+    
+    fprintf('Batch export complete! Aggregated %d records.\n', height(T));
 end
