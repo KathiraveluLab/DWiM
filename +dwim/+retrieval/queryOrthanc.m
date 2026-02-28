@@ -73,25 +73,19 @@ end
 
 % Execute query
 if isempty(fieldnames(query))
-    % No filters - get all studies
+    % No filters - use wildcard to retrieve all studies efficiently
+    % This avoids N+1 API calls (listStudies + getStudy for each)
     if options.Verbose
         fprintf('No filters specified, retrieving all studies...\n');
     end
-    studyIDs = client.listStudies();
-    studyData = cell(numel(studyIDs), 1);
-    for i = 1:numel(studyIDs)
-        studyData{i} = client.getStudy(studyIDs{i});
-        if options.Verbose && mod(i, 10) == 0
-            fprintf('  Retrieved %d/%d studies\n', i, numel(studyIDs));
-        end
-    end
-else
-    % Use advanced find with filters
-    if options.Verbose
-        fprintf('Executing filtered query...\n');
-    end
-    studyData = client.findStudies(query);
+    query.PatientID = '*';  % Wildcard matches all patients
 end
+
+% Use advanced find with filters (or wildcard)
+if options.Verbose
+    fprintf('Executing query...\n');
+end
+studyData = client.findStudies(query);
 
 if isempty(studyData)
     if options.Verbose
@@ -144,30 +138,41 @@ for i = 1:numStudies
     end
     
     % Extract series information
-    if isfield(study, 'Series')
+    % Note: findStudies with Expand=true returns nested series data
+    if isfield(study, 'Series') && ~isempty(study.Series)
         results.SeriesCount(i) = numel(study.Series);
         
-        % Get modality from first series
-        if numel(study.Series) > 0
-            try
+        try
+            % Use expanded series data to avoid additional API calls
+            if iscell(study.Series)
+                % Series are IDs only - need to fetch (shouldn't happen with Expand=true)
                 firstSeries = client.getSeries(study.Series{1});
                 if isfield(firstSeries, 'MainDicomTags') && ...
                    isfield(firstSeries.MainDicomTags, 'Modality')
                     results.Modality{i} = firstSeries.MainDicomTags.Modality;
                 end
+            else
+                % Series are already expanded structs
+                firstSeries = study.Series(1);
+                if isfield(firstSeries, 'MainDicomTags') && ...
+                   isfield(firstSeries.MainDicomTags, 'Modality')
+                    results.Modality{i} = firstSeries.MainDicomTags.Modality;
+                end
                 
-                % Count total instances
+                % Count total instances from expanded data
                 totalInstances = 0;
                 for j = 1:numel(study.Series)
-                    seriesInfo = client.getSeries(study.Series{j});
-                    if isfield(seriesInfo, 'Instances')
-                        totalInstances = totalInstances + numel(seriesInfo.Instances);
+                    if isfield(study.Series(j), 'Instances')
+                        totalInstances = totalInstances + numel(study.Series(j).Instances);
                     end
                 end
                 results.InstanceCount(i) = totalInstances;
-            catch
-                % Skip if series metadata unavailable
             end
+        catch ME
+            % Log warning if series metadata unavailable
+            warning('queryOrthanc:SeriesMetadata', ...
+                'Could not retrieve metadata for series in study %s: %s', ...
+                study.ID, ME.message);
         end
     end
 end

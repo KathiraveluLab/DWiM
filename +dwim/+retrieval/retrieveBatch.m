@@ -189,7 +189,7 @@ if options.ProcessVolumes && summary.studiesDownloaded > 0
             seriesDirs = seriesDirs([seriesDirs.isdir]);
             
             if ~isempty(seriesDirs)
-                % Process first series (or all if multiple)
+                % Process first series only
                 seriesPath = fullfile(studyPath, seriesDirs(1).name);
                 
                 [volume, spacing, metadata] = ...

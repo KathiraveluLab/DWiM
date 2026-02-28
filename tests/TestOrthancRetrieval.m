@@ -39,7 +39,7 @@ classdef TestOrthancRetrieval < matlab.unittest.TestCase
     methods
         function skipIfNoOrthanc(tc)
             if tc.SkipTests
-                tc.verifyFail('Orthanc not available - test skipped');
+                tc.assumeFalse(tc.SkipTests, 'Orthanc not available - test skipped');
             end
         end
     end
@@ -198,14 +198,14 @@ classdef TestOrthancRetrieval < matlab.unittest.TestCase
             tc.skipIfNoOrthanc();
             
             % Test error handling for invalid study ID
-            tc.verifyError(@() tc.Client.getStudy("invalid_id_xyz"), '?');
+            tc.verifyError(@() tc.Client.getStudy("invalid_id_xyz"), 'MATLAB:webservices:HTTP404StatusCodeError');
         end
         
         function testErrorHandlingInvalidSeriesID(tc)
             tc.skipIfNoOrthanc();
             
             % Test error handling for invalid series ID
-            tc.verifyError(@() tc.Client.getSeries("invalid_series_xyz"), '?');
+            tc.verifyError(@() tc.Client.getSeries("invalid_series_xyz"), 'MATLAB:webservices:HTTP404StatusCodeError');
         end
     end
 end
