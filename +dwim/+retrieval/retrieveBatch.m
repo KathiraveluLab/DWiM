@@ -10,6 +10,7 @@ function summary = retrieveBatch(queryParams, outputDir, options)
 %
 %   Name-Value Arguments:
 %       ProcessVolumes    - Build 3D volumes after download (default: false)
+%                           Note: Only processes first series per study
 %       AnonymizeBeforeSave - Anonymize downloaded files (default: false)
 %       Parallel          - Use parallel download (default: true)
 %       MaxStudies        - Maximum studies to retrieve (default: inf)
@@ -188,6 +189,12 @@ if options.ProcessVolumes && summary.studiesDownloaded > 0
             
             if ~isempty(seriesDirs)
                 % Process first series only
+                % Note: Studies may contain multiple series (different sequences/planes)
+                % Currently only the first series is processed for volume building
+                if numel(seriesDirs) > 1 && options.Verbose
+                    warning('retrieveBatch:MultipleSeries', ...
+                        'Study has %d series, processing only the first', numel(seriesDirs));
+                end
                 seriesPath = fullfile(studyPath, seriesDirs(1).name);
                 
                 [volume, spacing, metadata] = ...
