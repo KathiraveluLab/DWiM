@@ -91,9 +91,7 @@ classdef TestOrthancRetrieval < matlab.unittest.TestCase
             
             % Get first study
             studies = tc.Client.listStudies();
-            if isempty(studies)
-                tc.verifyFail('No studies available for testing');
-            end
+            tc.assumeFalse(isempty(studies), 'No studies available for testing');
             
             % Test metadata retrieval
             metadata = tc.Client.getStudy(studies{1});
@@ -144,9 +142,7 @@ classdef TestOrthancRetrieval < matlab.unittest.TestCase
             
             % Get first series
             seriesList = tc.Client.listSeries();
-            if isempty(seriesList)
-                tc.verifyFail('No series available for testing');
-            end
+            tc.assumeFalse(isempty(seriesList), 'No series available for testing');
             
             % Create a temporary folder fixture for automatic cleanup
             tempFolderFixture = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);

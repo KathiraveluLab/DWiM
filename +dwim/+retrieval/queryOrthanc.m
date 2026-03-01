@@ -44,14 +44,19 @@ arguments
     options.SortOrder (1,1) string {mustBeMember(options.SortOrder, ...
         ["ascend", "descend"])} = "descend"
     options.Verbose (1,1) logical = false
+    options.Client = []  % Optional existing OrthancClient instance
 end
 
 if options.Verbose
     fprintf('=== DWiM: Querying Orthanc ===\n');
 end
 
-% Create Orthanc client
-client = dwim.retrieval.OrthancClient('Verbose', options.Verbose);
+% Create or use existing Orthanc client
+if isempty(options.Client)
+    client = dwim.retrieval.OrthancClient('Verbose', options.Verbose);
+else
+    client = options.Client;
+end
 
 % Build query structure
 query = struct();
@@ -155,11 +160,20 @@ for i = 1:numStudies
                     results.Modality{i} = firstSeries.MainDicomTags.Modality;
                 end
             else
-                % Series are already expanded structs
-                firstSeries = study.Series(1);
-                if isfield(firstSeries, 'MainDicomTags') && ...
-                   isfield(firstSeries.MainDicomTags, 'Modality')
-                    results.Modality{i} = firstSeries.MainDicomTags.Modality;
+                % Series are already expanded structs - collect all unique modalities
+                modalities = {};
+                for j = 1:numel(study.Series)
+                    if isfield(study.Series(j), 'MainDicomTags') && ...
+                       isfield(study.Series(j).MainDicomTags, 'Modality')
+                        modality = study.Series(j).MainDicomTags.Modality;
+                        if ~ismember(modality, modalities)
+                            modalities{end+1} = modality; %#ok<AGROW>
+                        end
+                    end
+                end
+                % Store as comma-separated string if multiple modalities
+                if ~isempty(modalities)
+                    results.Modality{i} = strjoin(modalities, ', ');
                 end
                 
                 % Count total instances from expanded data

@@ -143,12 +143,20 @@ if options.Parallel && numStudies > 1
 else
     % Serial download
     client = dwim.retrieval.OrthancClient('Verbose', false);
+    
+    % Pre-allocate arrays for efficiency
+    summary.studyPaths = cell(numStudies, 1);
+    summary.errors = cell(numStudies, 1);
+    successCount = 0;
+    errorCount = 0;
+    
     for i = 1:numStudies
         try
             [studyPath, seriesCount, fileCount] = ...
                 downloadStudy(client, studies(i,:), outputDir, options);
             
-            summary.studyPaths{end+1} = studyPath;
+            successCount = successCount + 1;
+            summary.studyPaths{successCount} = studyPath;
             summary.seriesDownloaded = summary.seriesDownloaded + seriesCount;
             summary.filesDownloaded = summary.filesDownloaded + fileCount;
             
@@ -167,12 +175,17 @@ else
             end
             
         catch ME
-            summary.errors{end+1} = sprintf('Study %d: %s', i, ME.message);
+            errorCount = errorCount + 1;
+            summary.errors{errorCount} = ME.message;
             if options.Verbose
-                fprintf('  Study %d/%d FAILED: %s\n', i, numStudies, ME.message);
+                fprintf('  Study %d/%d failed: %s\n', i, numStudies, ME.message);
             end
         end
     end
+    
+    % Trim unused portions of pre-allocated arrays
+    summary.studyPaths = summary.studyPaths(1:successCount);
+    summary.errors = summary.errors(1:errorCount);
 end
 
 summary.studiesDownloaded = numel(summary.studyPaths);
@@ -272,7 +285,19 @@ function [studyPath, seriesCount, fileCount] = downloadStudy(client, study, base
     
     % Download each series
     for j = 1:seriesCount
-        seriesID = seriesList{j};
+        % Extract series ID (handle both struct and string formats)
+        if isstruct(seriesList)
+            seriesID = seriesList(j).ID;  % Expanded struct from query
+        elseif iscell(seriesList)
+            if isstruct(seriesList{j})
+                seriesID = seriesList{j}.ID;  % Struct in cell
+            else
+                seriesID = seriesList{j};  % String ID in cell
+            end
+        else
+            seriesID = seriesList(j);  % Direct string
+        end
+        
         seriesDir = fullfile(studyPath, sprintf('series_%02d', j));
         
         % Download series (capture but don't block on partial failures)

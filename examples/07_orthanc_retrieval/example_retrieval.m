@@ -61,6 +61,11 @@ fprintf('\n');
 fprintf('Example 3: Downloading single series...\n');
 
 try
+    % Ensure client exists
+    if ~exist('client', 'var') || ~isvalid(client)
+        client = dwim.retrieval.OrthancClient();
+    end
+    
     % Get first series from first study
     studies = client.listStudies();
     if ~isempty(studies)
