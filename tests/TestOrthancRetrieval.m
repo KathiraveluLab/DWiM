@@ -170,25 +170,24 @@ classdef TestOrthancRetrieval < matlab.unittest.TestCase
             
             % Test batch retrieval with limit
             query = struct();
-            query.Limit = 2;
             
-            try
-                summary = dwim.retrieval.retrieveBatch(query, tempFolderFixture.Folder, ...
-                    'MaxStudies', 2, ...
-                    'Parallel', false, ...
-                    'Verbose', false);
-                
-                tc.verifyTrue(isstruct(summary));
-                tc.verifyTrue(isfield(summary, 'studiesDownloaded'));
-                tc.verifyLessThanOrEqual(summary.studiesDownloaded, 2);
-                
-            catch ME
-                % Allow failure if no studies available
-                if contains(ME.message, 'No studies')
-                    warning('No studies available for batch test');
-                else
-                    rethrow(ME);
-                end
+            summary = dwim.retrieval.retrieveBatch(query, tempFolderFixture.Folder, ...
+                'MaxStudies', 2, ...
+                'Parallel', false, ...
+                'Verbose', false);
+            
+            % Verify summary structure
+            tc.verifyTrue(isstruct(summary));
+            tc.verifyTrue(isfield(summary, 'studiesDownloaded'));
+            
+            % Function should handle zero studies gracefully
+            tc.verifyGreaterThanOrEqual(summary.studiesDownloaded, 0);
+            tc.verifyLessThanOrEqual(summary.studiesDownloaded, 2);
+            
+            % If studies were downloaded, verify paths exist
+            if summary.studiesDownloaded > 0
+                tc.verifyTrue(isfield(summary, 'studyPaths'));
+                tc.verifyGreaterThan(numel(summary.studyPaths), 0);
             end
         end
         

@@ -11,7 +11,6 @@ function summary = retrieveBatch(queryParams, outputDir, options)
 %   Name-Value Arguments:
 %       ProcessVolumes    - Build 3D volumes after download (default: false)
 %                           Note: Only processes first series per study
-%       AnonymizeBeforeSave - Anonymize downloaded files (default: false)
 %       Parallel          - Use parallel download (default: true)
 %       MaxStudies        - Maximum studies to retrieve (default: inf)
 %       Verbose           - Display progress (default: true)
@@ -28,7 +27,7 @@ function summary = retrieveBatch(queryParams, outputDir, options)
 %
 %       % Download and process to 3D volumes
 %       summary = dwim.retrieval.retrieveBatch(query, './output', ...
-%           'ProcessVolumes', true, 'AnonymizeBeforeSave', true);
+%           'ProcessVolumes', true);
 %
 %       % Custom callback for each study
 %       callback = @(studyPath, metadata) fprintf('Downloaded: %s\n', studyPath);
@@ -39,7 +38,6 @@ arguments
     queryParams (1,1) struct
     outputDir (1,1) string = "./orthanc_downloads"
     options.ProcessVolumes (1,1) logical = false
-    options.AnonymizeBeforeSave (1,1) logical = false
     options.Parallel (1,1) logical = true
     options.MaxStudies (1,1) double {mustBePositive} = inf
     options.Verbose (1,1) logical = true
@@ -73,13 +71,22 @@ if options.Verbose
 end
 
 try
-    % Convert struct to name-value pairs for queryOrthanc (vectorized)
-    if ~isempty(fieldnames(queryParams))
-        queryArgs = reshape([fieldnames(queryParams) struct2cell(queryParams)]', 1, []);
-    else
-        queryArgs = {};
+    % Determine effective limit (combine MaxStudies with query Limit)
+    effectiveLimit = options.MaxStudies;
+    if isfield(queryParams, 'Limit') && ~isinf(queryParams.Limit)
+        effectiveLimit = min(effectiveLimit, queryParams.Limit);
     end
-    queryArgs = [queryArgs, {'Verbose', options.Verbose}];
+    
+    % Convert struct to name-value pairs for queryOrthanc
+    queryArgs = {};
+    if ~isempty(fieldnames(queryParams))
+        fields = fieldnames(queryParams);
+        for i = 1:numel(fields)
+            field = fields{i};
+            queryArgs = [queryArgs, {field, queryParams.(field)}]; %#ok<AGROW>
+        end
+    end
+    queryArgs = [queryArgs, {'Limit', effectiveLimit, 'Verbose', options.Verbose}];
     
     studies = dwim.retrieval.queryOrthanc(queryArgs{:});
     
@@ -92,9 +99,7 @@ try
         return;
     end
     
-    % Apply max studies limit
-    numStudies = min(height(studies), options.MaxStudies);
-    studies = studies(1:numStudies, :);
+    numStudies = height(studies);
     
     if options.Verbose
         fprintf('Found %d studies to download\n', numStudies);
@@ -270,8 +275,8 @@ function [studyPath, seriesCount, fileCount] = downloadStudy(client, study, base
         seriesID = seriesList{j};
         seriesDir = fullfile(studyPath, sprintf('series_%02d', j));
         
-        % Download series
-        client.downloadSeries(seriesID, seriesDir, 'CreateSubdir', false);
+        % Download series (capture but don't block on partial failures)
+        [~, ~] = client.downloadSeries(seriesID, seriesDir, 'CreateSubdir', false);
         
         % Count files
         files = dir(fullfile(seriesDir, '*.dcm'));

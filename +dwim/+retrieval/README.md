@@ -226,7 +226,7 @@ end
 
 ## Requirements
 
-- MATLAB R2025a or later
+- MATLAB R2020a or later
 - Orthanc server with REST API enabled
 - Network access to Orthanc
 - Sufficient disk space for downloads

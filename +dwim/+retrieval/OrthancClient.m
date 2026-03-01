@@ -187,10 +187,10 @@ classdef OrthancClient < handle
             end
         end
         
-        function filepath = downloadSeries(obj, seriesID, outputDir, options)
+        function [filepath, failedInstances] = downloadSeries(obj, seriesID, outputDir, options)
             %DOWNLOADSERIES Download series as DICOM files
             %
-            %   filepath = client.downloadSeries(seriesID, outputDir)
+            %   [filepath, failedInstances] = client.downloadSeries(seriesID, outputDir)
             %   downloads all instances from the series to outputDir
             %
             %   Name-Value Arguments:
@@ -199,6 +199,7 @@ classdef OrthancClient < handle
             %
             %   Returns:
             %       filepath - Path to download directory
+            %       failedInstances - Cell array of instance IDs that failed to download
             
             arguments
                 obj
@@ -228,6 +229,9 @@ classdef OrthancClient < handle
                     numel(instances), seriesID);
             end
             
+            % Track failed downloads
+            failedInstances = {};
+            
             % Download each instance
             for i = 1:numel(instances)
                 instanceID = instances{i};
@@ -252,6 +256,7 @@ classdef OrthancClient < handle
                         fprintf('  Downloaded %d/%d instances\n', i, numel(instances));
                     end
                 catch ME
+                    failedInstances{end+1} = instanceID; %#ok<AGROW>
                     warning('Failed to download instance %s: %s', instanceID, ME.message);
                 end
             end
@@ -259,7 +264,12 @@ classdef OrthancClient < handle
             filepath = seriesDir;
             
             if obj.Verbose
-                fprintf('Download complete: %s\n', filepath);
+                if isempty(failedInstances)
+                    fprintf('Download complete: %s\n', filepath);
+                else
+                    fprintf('Download complete with %d failures: %s\n', ...
+                        numel(failedInstances), filepath);
+                end
             end
         end
         
