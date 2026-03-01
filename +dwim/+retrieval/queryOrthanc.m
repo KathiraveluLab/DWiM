@@ -82,10 +82,11 @@ if isempty(fieldnames(query))
 end
 
 % Use advanced find with filters (or wildcard)
+% Pass limit to server for efficient filtering
 if options.Verbose
     fprintf('Executing query...\n');
 end
-studyData = client.findStudies(query);
+studyData = client.findStudies(query, 'Limit', options.Limit);
 
 if isempty(studyData)
     if options.Verbose
@@ -177,11 +178,6 @@ for i = 1:numStudies
                 study.ID, ME.message);
         end
     end
-end
-
-% Apply limit
-if ~isinf(options.Limit) && height(results) > options.Limit
-    results = results(1:options.Limit, :);
 end
 
 % Apply sorting

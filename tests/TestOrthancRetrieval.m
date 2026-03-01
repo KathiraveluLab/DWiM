@@ -148,12 +148,11 @@ classdef TestOrthancRetrieval < matlab.unittest.TestCase
                 tc.verifyFail('No series available for testing');
             end
             
-            % Create temp directory
-            tempDir = fullfile(tempdir, ['dwim_test_' char(datetime('now', 'Format', 'yyyyMMddHHmmss'))]);
-            testCleanup = onCleanup(@() rmdir(tempDir, 's'));
+            % Create a temporary folder fixture for automatic cleanup
+            tempFolderFixture = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
             
             % Test download
-            seriesPath = tc.Client.downloadSeries(seriesList{1}, tempDir, ...
+            seriesPath = tc.Client.downloadSeries(seriesList{1}, tempFolderFixture.Folder, ...
                 'CreateSubdir', false);
             
             tc.verifyTrue(exist(seriesPath, 'dir') == 7);
@@ -166,16 +165,15 @@ classdef TestOrthancRetrieval < matlab.unittest.TestCase
         function testRetrieveBatchSmall(tc)
             tc.skipIfNoOrthanc();
             
-            % Create temp directory
-            tempDir = fullfile(tempdir, ['dwim_batch_' char(datetime('now', 'Format', 'yyyyMMddHHmmss'))]);
-            testCleanup = onCleanup(@() rmdir(tempDir, 's'));
+            % Create a temporary folder fixture for automatic cleanup
+            tempFolderFixture = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture);
             
             % Test batch retrieval with limit
             query = struct();
             query.Limit = 2;
             
             try
-                summary = dwim.retrieval.retrieveBatch(query, tempDir, ...
+                summary = dwim.retrieval.retrieveBatch(query, tempFolderFixture.Folder, ...
                     'MaxStudies', 2, ...
                     'Parallel', false, ...
                     'Verbose', false);

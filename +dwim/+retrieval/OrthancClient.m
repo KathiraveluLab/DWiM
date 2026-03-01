@@ -138,7 +138,7 @@ classdef OrthancClient < handle
             instance = webread(url, obj.WebOptions);
         end
         
-        function results = findStudies(obj, query)
+        function results = findStudies(obj, query, options)
             %FINDSTUDIES Advanced study search with filtering
             %
             %   results = client.findStudies(query) searches for studies
@@ -151,14 +151,18 @@ classdef OrthancClient < handle
             %       Modality        - Imaging modality (CT, MR, etc.)
             %       StudyDescription - Study description
             %
+            %   Name-Value Arguments:
+            %       Limit - Maximum number of results (server-side)
+            %
             %   Example:
             %       query.Modality = 'CT';
             %       query.StudyDate = '20250101-20251231';
-            %       results = client.findStudies(query);
+            %       results = client.findStudies(query, 'Limit', 100);
             
             arguments
                 obj
                 query (1,1) struct
+                options.Limit (1,1) double = inf
             end
             
             % Orthanc tools/find REST endpoint
@@ -169,6 +173,11 @@ classdef OrthancClient < handle
             orthancQuery.Level = 'Study';
             orthancQuery.Query = query;
             orthancQuery.Expand = true;
+            
+            % Apply server-side limit if specified
+            if ~isinf(options.Limit)
+                orthancQuery.Limit = options.Limit;
+            end
             
             % POST query to Orthanc
             results = webwrite(url, orthancQuery, obj.WebOptions);

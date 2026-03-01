@@ -109,12 +109,10 @@ if options.Verbose
     fprintf('\nStep 2/3: Downloading DICOM files...\n');
 end
 
-% Create Orthanc client
-client = dwim.retrieval.OrthancClient('Verbose', false);
-
 % Download each study
 if options.Parallel && numStudies > 1
     % Parallel download
+    % Create client inside parfor for thread safety
     studyPaths = cell(numStudies, 1);
     seriesCounts = zeros(numStudies, 1);
     fileCounts = zeros(numStudies, 1);
@@ -122,8 +120,10 @@ if options.Parallel && numStudies > 1
     
     parfor i = 1:numStudies
         try
+            % Each worker creates its own client instance
+            workerClient = dwim.retrieval.OrthancClient('Verbose', false);
             [studyPaths{i}, seriesCounts(i), fileCounts(i)] = ...
-                downloadStudy(client, studies(i,:), outputDir, options);
+                downloadStudy(workerClient, studies(i,:), outputDir, options);
         catch ME
             errors{i} = ME.message;
         end
@@ -137,6 +137,7 @@ if options.Parallel && numStudies > 1
     
 else
     % Serial download
+    client = dwim.retrieval.OrthancClient('Verbose', false);
     for i = 1:numStudies
         try
             [studyPath, seriesCount, fileCount] = ...
