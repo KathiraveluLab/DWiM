@@ -75,7 +75,7 @@ query.Modality = 'CT';
 summary = dwim.retrieval.retrieveBatch(query, './data');
 
 % 2. Anonymize (if needed)
-% Use Suryansh's anonymization module
+% Use the DWiM anonymization module
 for i = 1:numel(summary.studyPaths)
     studyPath = summary.studyPaths{i};
     % anonymize files in studyPath...

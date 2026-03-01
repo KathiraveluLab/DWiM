@@ -72,15 +72,13 @@ if options.Verbose
 end
 
 try
-    % Convert struct to name-value pairs for queryOrthanc
-    queryArgs = {};
-    fields = fieldnames(queryParams);
-    for i = 1:numel(fields)
-        queryArgs{end+1} = fields{i}; %#ok<AGROW>
-        queryArgs{end+1} = queryParams.(fields{i}); %#ok<AGROW>
+    % Convert struct to name-value pairs for queryOrthanc (vectorized)
+    if ~isempty(fieldnames(queryParams))
+        queryArgs = reshape([fieldnames(queryParams) struct2cell(queryParams)]', 1, []);
+    else
+        queryArgs = {};
     end
-    queryArgs{end+1} = 'Verbose';
-    queryArgs{end+1} = options.Verbose;
+    queryArgs = [queryArgs, {'Verbose', options.Verbose}];
     
     studies = dwim.retrieval.queryOrthanc(queryArgs{:});
     
@@ -247,9 +245,15 @@ function [studyPath, seriesCount, fileCount] = downloadStudy(client, study, base
         mkdir(studyPath);
     end
     
-    % Get study metadata to find series
-    studyInfo = client.getStudy(studyID);
-    seriesList = studyInfo.Series;
+    % Get series list from study table (avoids N+1 API call)
+    if ~isempty(study.Series{1})
+        % Use series data from queryOrthanc result
+        seriesList = study.Series{1};
+    else
+        % Fallback: fetch from API if not in table
+        studyInfo = client.getStudy(studyID);
+        seriesList = studyInfo.Series;
+    end
     seriesCount = numel(seriesList);
     fileCount = 0;
     

@@ -106,6 +106,7 @@ results.StudyDescription = cell(numStudies, 1);
 results.Modality = cell(numStudies, 1);
 results.SeriesCount = zeros(numStudies, 1);
 results.InstanceCount = zeros(numStudies, 1);
+results.Series = cell(numStudies, 1);
 
 for i = 1:numStudies
     study = studyData{i};
@@ -140,6 +141,7 @@ for i = 1:numStudies
     % Extract series information
     % Note: findStudies with Expand=true returns nested series data
     if isfield(study, 'Series') && ~isempty(study.Series)
+        results.Series{i} = study.Series;  % Store for batch operations
         results.SeriesCount(i) = numel(study.Series);
         
         try
