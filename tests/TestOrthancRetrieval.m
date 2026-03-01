@@ -153,9 +153,26 @@ classdef TestOrthancRetrieval < matlab.unittest.TestCase
             
             tc.verifyTrue(exist(seriesPath, 'dir') == 7);
             
-            % Verify files were downloaded
+            % Verify files were downloaded - compare with expected count
             files = dir(fullfile(seriesPath, '*.dcm'));
-            tc.verifyGreaterThan(numel(files), 0);
+            
+            % Get expected number of instances (graceful handling)
+            try
+                seriesInfo = tc.Client.getSeries(seriesList{1});
+                if isfield(seriesInfo, 'Instances')
+                    expectedInstances = numel(seriesInfo.Instances);
+                    tc.verifyEqual(numel(files), expectedInstances, ...
+                        'Number of downloaded files should match expected instances');
+                else
+                    % Fallback if metadata doesn't have Instances field
+                    tc.verifyGreaterThan(numel(files), 0, ...
+                        'At least one file should be downloaded');
+                end
+            catch
+                % If metadata retrieval fails, just verify we got some files
+                tc.verifyGreaterThan(numel(files), 0, ...
+                    'At least one file should be downloaded');
+            end
         end
         
         function testRetrieveBatchSmall(tc)

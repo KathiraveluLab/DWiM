@@ -161,19 +161,23 @@ for i = 1:numStudies
                 end
             else
                 % Series are already expanded structs - collect all unique modalities
-                modalities = {};
-                for j = 1:numel(study.Series)
+                numSeries = numel(study.Series);
+                modalityList = cell(numSeries, 1);
+                modalityCount = 0;
+                
+                for j = 1:numSeries
                     if isfield(study.Series(j), 'MainDicomTags') && ...
                        isfield(study.Series(j).MainDicomTags, 'Modality')
-                        modality = study.Series(j).MainDicomTags.Modality;
-                        if ~ismember(modality, modalities)
-                            modalities{end+1} = modality; %#ok<AGROW>
-                        end
+                        modalityCount = modalityCount + 1;
+                        modalityList{modalityCount} = study.Series(j).MainDicomTags.Modality;
                     end
                 end
-                % Store as comma-separated string if multiple modalities
-                if ~isempty(modalities)
-                    results.Modality{i} = strjoin(modalities, ', ');
+                
+                % Get unique modalities and store as comma-separated string
+                if modalityCount > 0
+                    modalityList = modalityList(1:modalityCount);
+                    uniqueModalities = unique(modalityList);
+                    results.Modality{i} = strjoin(uniqueModalities, ', ');
                 end
                 
                 % Count total instances from expanded data

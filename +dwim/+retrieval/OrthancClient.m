@@ -210,8 +210,15 @@ classdef OrthancClient < handle
             end
             
             % Get series metadata to find instances
-            seriesInfo = obj.getSeries(seriesID);
-            instances = seriesInfo.Instances;
+            try
+                seriesInfo = obj.getSeries(seriesID);
+                instances = seriesInfo.Instances;
+            catch ME
+                warning('Failed to retrieve series metadata for %s: %s', seriesID, ME.message);
+                filepath = "";
+                failedInstances = {seriesID};
+                return;
+            end
             
             % Create output directory
             if options.CreateSubdir
@@ -296,10 +303,14 @@ classdef OrthancClient < handle
                 fprintf('Downloading series %s as ZIP archive...\n', seriesID);
             end
             
-            archive = websave(outputPath, url, obj.WebOptions);
-            
-            if obj.Verbose
-                fprintf('Archive saved: %s\n', archive);
+            try
+                archive = websave(outputPath, url, obj.WebOptions);
+                
+                if obj.Verbose
+                    fprintf('Archive saved: %s\n', archive);
+                end
+            catch ME
+                error('Failed to download series archive %s: %s', seriesID, ME.message);
             end
         end
     end

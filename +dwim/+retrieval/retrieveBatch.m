@@ -63,6 +63,7 @@ summary.studiesDownloaded = 0;
 summary.seriesDownloaded = 0;
 summary.filesDownloaded = 0;
 summary.errors = {};
+summary.partialDownloads = {};  % Track series with incomplete downloads
 summary.studyPaths = {};
 
 % Step 1: Query Orthanc for matching studies
@@ -77,14 +78,13 @@ try
         effectiveLimit = min(effectiveLimit, queryParams.Limit);
     end
     
-    % Convert struct to name-value pairs for queryOrthanc
+    % Convert struct to name-value pairs for queryOrthanc (efficient)
     queryArgs = {};
     if ~isempty(fieldnames(queryParams))
         fields = fieldnames(queryParams);
-        for i = 1:numel(fields)
-            field = fields{i};
-            queryArgs = [queryArgs, {field, queryParams.(field)}]; %#ok<AGROW>
-        end
+        values = struct2cell(queryParams);
+        queryArgs = [fields'; values'];
+        queryArgs = queryArgs(:)';
     end
     queryArgs = [queryArgs, {'Limit', effectiveLimit, 'Verbose', options.Verbose}];
     
@@ -300,8 +300,16 @@ function [studyPath, seriesCount, fileCount] = downloadStudy(client, study, base
         
         seriesDir = fullfile(studyPath, sprintf('series_%02d', j));
         
-        % Download series (capture but don't block on partial failures)
-        [~, ~] = client.downloadSeries(seriesID, seriesDir, 'CreateSubdir', false);
+        % Download series and track partial failures
+        [~, failedInst] = client.downloadSeries(seriesID, seriesDir, 'CreateSubdir', false);
+        
+        % Record partial download failures
+        if ~isempty(failedInst)
+            summary.partialDownloads{end+1} = struct(...
+                'studyID', studyID, ...
+                'seriesID', seriesID, ...
+                'failedInstances', {failedInst}); %#ok<AGROW>
+        end
         
         % Count files
         files = dir(fullfile(seriesDir, '*.dcm'));
