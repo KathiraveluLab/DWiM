@@ -122,12 +122,13 @@ if options.Parallel && numStudies > 1
     seriesCounts = zeros(numStudies, 1);
     fileCounts = zeros(numStudies, 1);
     errors = cell(numStudies, 1);
+    allPartials = cell(numStudies, 1);  % Collect partial downloads
     
     parfor i = 1:numStudies
         try
             % Each worker creates its own client instance
             workerClient = dwim.retrieval.OrthancClient('Verbose', false);
-            [studyPaths{i}, seriesCounts(i), fileCounts(i)] = ...
+            [studyPaths{i}, seriesCounts(i), fileCounts(i), allPartials{i}] = ...
                 downloadStudy(workerClient, studies(i,:), outputDir, options);
         catch ME
             errors{i} = ME.message;
@@ -139,6 +140,14 @@ if options.Parallel && numStudies > 1
     summary.seriesDownloaded = sum(seriesCounts);
     summary.filesDownloaded = sum(fileCounts);
     summary.errors = errors(~cellfun('isempty', errors));
+    
+    % Flatten partial downloads from all studies
+    summary.partialDownloads = {};
+    for i = 1:numStudies
+        if ~isempty(allPartials{i})
+            summary.partialDownloads = [summary.partialDownloads, allPartials{i}];
+        end
+    end
     
 else
     % Serial download
@@ -152,13 +161,18 @@ else
     
     for i = 1:numStudies
         try
-            [studyPath, seriesCount, fileCount] = ...
+            [studyPath, seriesCount, fileCount, studyPartials] = ...
                 downloadStudy(client, studies(i,:), outputDir, options);
             
             successCount = successCount + 1;
             summary.studyPaths{successCount} = studyPath;
             summary.seriesDownloaded = summary.seriesDownloaded + seriesCount;
             summary.filesDownloaded = summary.filesDownloaded + fileCount;
+            
+            % Aggregate partial downloads from this study
+            if ~isempty(studyPartials)
+                summary.partialDownloads = [summary.partialDownloads, studyPartials];
+            end
             
             % Call user callback if provided
             if ~isempty(options.OnStudyComplete)
@@ -256,7 +270,7 @@ end
 end
 
 %% Helper function to download single study
-function [studyPath, seriesCount, fileCount] = downloadStudy(client, study, baseDir, options)
+function [studyPath, seriesCount, fileCount, partials] = downloadStudy(client, study, baseDir, options)
     % Create study directory
     studyID = study.StudyID{1};
     patientID = study.PatientID{1};
@@ -282,6 +296,7 @@ function [studyPath, seriesCount, fileCount] = downloadStudy(client, study, base
     end
     seriesCount = numel(seriesList);
     fileCount = 0;
+    partials = {};  % Collect partial download info locally
     
     % Download each series
     for j = 1:seriesCount
@@ -303,9 +318,9 @@ function [studyPath, seriesCount, fileCount] = downloadStudy(client, study, base
         % Download series and track partial failures
         [~, failedInst] = client.downloadSeries(seriesID, seriesDir, 'CreateSubdir', false);
         
-        % Record partial download failures
+        % Record partial download failures locally
         if ~isempty(failedInst)
-            summary.partialDownloads{end+1} = struct(...
+            partials{end+1} = struct(...
                 'studyID', studyID, ...
                 'seriesID', seriesID, ...
                 'failedInstances', {failedInst}); %#ok<AGROW>

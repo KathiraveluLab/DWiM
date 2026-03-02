@@ -319,8 +319,8 @@ classdef OrthancClient < handle
         function testConnection(obj)
             %TESTCONNECTION Verify connectivity to Orthanc server
             try
-                url = obj.BaseURL + "/system";
-                info = webread(url, obj.WebOptions);
+                % Use existing getSystemInfo method to avoid redundant API call
+                info = obj.getSystemInfo();
                 if obj.Verbose
                     fprintf('  Connected to Orthanc v%s\n', info.Version);
                 end
