@@ -61,19 +61,19 @@ end
 % Build query structure
 query = struct();
 if options.PatientID ~= ""
-    query.PatientID = char(options.PatientID);
+    query.PatientID = options.PatientID;
 end
 if options.PatientName ~= ""
-    query.PatientName = char(options.PatientName);
+    query.PatientName = options.PatientName;
 end
 if options.Modality ~= ""
-    query.ModalitiesInStudy = char(options.Modality);
+    query.ModalitiesInStudy = options.Modality;
 end
 if options.StudyDate ~= ""
-    query.StudyDate = char(options.StudyDate);
+    query.StudyDate = options.StudyDate;
 end
 if options.StudyDescription ~= ""
-    query.StudyDescription = char(options.StudyDescription);
+    query.StudyDescription = options.StudyDescription;
 end
 
 % Execute query
@@ -151,44 +151,47 @@ for i = 1:numStudies
         results.SeriesCount(i) = numel(study.Series);
         
         try
-            % Use expanded series data to avoid additional API calls
-            if iscell(study.Series)
-                % Series are IDs only - need to fetch (shouldn't happen with Expand=true)
-                firstSeries = client.getSeries(study.Series{1});
-                if isfield(firstSeries, 'MainDicomTags') && ...
-                   isfield(firstSeries.MainDicomTags, 'Modality')
-                    results.Modality{i} = firstSeries.MainDicomTags.Modality;
-                end
-            else
-                % Series are already expanded structs - collect all unique modalities
-                numSeries = numel(study.Series);
-                modalityList = cell(numSeries, 1);
-                modalityCount = 0;
-                
-                for j = 1:numSeries
-                    if isfield(study.Series(j), 'MainDicomTags') && ...
-                       isfield(study.Series(j).MainDicomTags, 'Modality')
-                        modalityCount = modalityCount + 1;
-                        modalityList{modalityCount} = study.Series(j).MainDicomTags.Modality;
-                    end
+            % Extract series data consistently whether it's an array of structs, 
+            % a cell array of structs, or just IDs (as a fallback)
+            numSeries = numel(study.Series);
+            modalityList = cell(numSeries, 1);
+            modalityCount = 0;
+            totalInstances = 0;
+            
+            for j = 1:numSeries
+                % Extract single series depending on format
+                if iscell(study.Series)
+                    seriesObj = study.Series{j};
+                else
+                    seriesObj = study.Series(j);
                 end
                 
-                % Get unique modalities and store as comma-separated string
-                if modalityCount > 0
-                    modalityList = modalityList(1:modalityCount);
-                    uniqueModalities = unique(modalityList);
-                    results.Modality{i} = strjoin(uniqueModalities, ', ');
+                % If it's just an ID string, fetch the expanded struct
+                if ischar(seriesObj) || isstring(seriesObj)
+                    seriesObj = client.getSeries(seriesObj);
                 end
                 
-                % Count total instances from expanded data
-                totalInstances = 0;
-                for j = 1:numel(study.Series)
-                    if isfield(study.Series(j), 'Instances')
-                        totalInstances = totalInstances + numel(study.Series(j).Instances);
-                    end
+                % Extract modality
+                if isfield(seriesObj, 'MainDicomTags') && ...
+                   isfield(seriesObj.MainDicomTags, 'Modality')
+                    modalityCount = modalityCount + 1;
+                    modalityList{modalityCount} = seriesObj.MainDicomTags.Modality;
                 end
-                results.InstanceCount(i) = totalInstances;
+                
+                % Extract instance count
+                if isfield(seriesObj, 'Instances')
+                    totalInstances = totalInstances + numel(seriesObj.Instances);
+                end
             end
+            
+            % Handle modalities
+            if modalityCount > 0
+                modalityList = modalityList(1:modalityCount);
+                uniqueModalities = unique(modalityList);
+                results.Modality{i} = strjoin(uniqueModalities, ', ');
+            end
+            
+            results.InstanceCount(i) = totalInstances;
         catch ME
             % Log warning if series metadata unavailable
             warning('queryOrthanc:SeriesMetadata', ...

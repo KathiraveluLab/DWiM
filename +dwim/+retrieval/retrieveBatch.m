@@ -142,11 +142,11 @@ if options.Parallel && numStudies > 1
     summary.errors = errors(~cellfun('isempty', errors));
     
     % Flatten partial downloads from all studies
-    summary.partialDownloads = {};
-    for i = 1:numStudies
-        if ~isempty(allPartials{i})
-            summary.partialDownloads = [summary.partialDownloads, allPartials{i}];
-        end
+    nonEmptyPartials = allPartials(~cellfun('isempty', allPartials));
+    if ~isempty(nonEmptyPartials)
+        summary.partialDownloads = [nonEmptyPartials{:}];
+    else
+        summary.partialDownloads = {};
     end
     
 else
@@ -156,6 +156,7 @@ else
     % Pre-allocate arrays for efficiency
     summary.studyPaths = cell(numStudies, 1);
     summary.errors = cell(numStudies, 1);
+    allPartials = cell(numStudies, 1);
     successCount = 0;
     errorCount = 0;
     
@@ -170,9 +171,7 @@ else
             summary.filesDownloaded = summary.filesDownloaded + fileCount;
             
             % Aggregate partial downloads from this study
-            if ~isempty(studyPartials)
-                summary.partialDownloads = [summary.partialDownloads, studyPartials];
-            end
+            allPartials{i} = studyPartials;
             
             % Call user callback if provided
             if ~isempty(options.OnStudyComplete)
@@ -200,6 +199,15 @@ else
     % Trim unused portions of pre-allocated arrays
     summary.studyPaths = summary.studyPaths(1:successCount);
     summary.errors = summary.errors(1:errorCount);
+    
+    % Aggregate partial downloads
+    nonEmptyPartials = allPartials(1:successCount);
+    nonEmptyPartials = nonEmptyPartials(~cellfun('isempty', nonEmptyPartials));
+    if ~isempty(nonEmptyPartials)
+        summary.partialDownloads = [nonEmptyPartials{:}];
+    else
+        summary.partialDownloads = {};
+    end
 end
 
 summary.studiesDownloaded = numel(summary.studyPaths);

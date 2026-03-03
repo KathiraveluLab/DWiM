@@ -122,7 +122,8 @@ classdef TestOrthancRetrieval < matlab.unittest.TestCase
             % Verify modality filter worked (if results exist)
             if height(results) > 0
                 % Check first result has correct modality
-                tc.verifyEqual(results.Modality{1}, testModality);
+                tc.verifyTrue(contains(results.Modality{1}, testModality), ...
+                    'The returned modality string should contain the queried modality');
             end
         end
         
