@@ -334,7 +334,7 @@ function [studyPath, seriesCount, fileCount, partials] = downloadStudy(client, s
         seriesDir = fullfile(studyPath, sprintf('series_%02d', j));
         
         % Download series and track partial failures
-        [~, failedInst] = client.downloadSeries(seriesID, seriesDir, 'CreateSubdir', false);
+        [~, failedInst, dlCount] = client.downloadSeries(seriesID, seriesDir, 'CreateSubdir', false);
         
         % Record partial download failures locally
         if ~isempty(failedInst)
@@ -344,8 +344,7 @@ function [studyPath, seriesCount, fileCount, partials] = downloadStudy(client, s
                 'failedInstances', {failedInst}); %#ok<AGROW>
         end
         
-        % Count files
-        files = dir(fullfile(seriesDir, '*.dcm'));
-        fileCount = fileCount + numel(files);
+        % Use download count returned by client instead of filesystem I/O
+        fileCount = fileCount + dlCount;
     end
 end

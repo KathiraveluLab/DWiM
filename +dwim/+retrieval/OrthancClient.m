@@ -185,7 +185,7 @@ classdef OrthancClient < handle
             end
         end
         
-        function [filepath, failedInstances] = downloadSeries(obj, seriesID, outputDir, options)
+        function [filepath, failedInstances, downloadCount] = downloadSeries(obj, seriesID, outputDir, options)
             %DOWNLOADSERIES Download series as DICOM files
             %
             %   [filepath, failedInstances] = client.downloadSeries(seriesID, outputDir)
@@ -198,6 +198,7 @@ classdef OrthancClient < handle
             %   Returns:
             %       filepath - Path to download directory
             %       failedInstances - Cell array of instance IDs that failed to download
+            %       downloadCount - Number of successfully downloaded files
             
             arguments
                 obj
@@ -215,6 +216,7 @@ classdef OrthancClient < handle
                 warning('Failed to retrieve series metadata for %s: %s', seriesID, ME.message);
                 filepath = "";
                 failedInstances = {};
+                downloadCount = 0;
                 return;
             end
             
@@ -235,8 +237,8 @@ classdef OrthancClient < handle
             end
             
             % Track failed downloads
-            failedInstances = cell(numel(instances), 1);
-            failureCount = 0;
+            failedInstances = {};
+            downloadCount = 0;
             
             % Download each instance
             for i = 1:numel(instances)
@@ -257,19 +259,16 @@ classdef OrthancClient < handle
                 try
                     % Use websave for binary file download
                     websave(outputFile, url, obj.WebOptions);
+                    downloadCount = downloadCount + 1;
                     
                     if obj.Verbose && mod(i, 10) == 0
                         fprintf('  Downloaded %d/%d instances\n', i, numel(instances));
                     end
                 catch ME
-                    failureCount = failureCount + 1;
-                    failedInstances{failureCount} = instanceID;
+                    failedInstances{end+1} = instanceID; %#ok<AGROW>
                     warning('Failed to download instance %s: %s', instanceID, ME.message);
                 end
             end
-            
-            % Trim unused portion of failedInstances
-            failedInstances = failedInstances(1:failureCount);
             
             filepath = seriesDir;
             
@@ -317,11 +316,8 @@ classdef OrthancClient < handle
         function testConnection(obj)
             %TESTCONNECTION Verify connectivity to Orthanc server
             try
-                % Use existing getSystemInfo method to avoid redundant API call
-                info = obj.getSystemInfo();
-                if obj.Verbose
-                    fprintf('  Connected to Orthanc v%s\n', info.Version);
-                end
+                % Reuse getSystemInfo which already prints version when Verbose
+                obj.getSystemInfo();
             catch ME
                 error('OrthancClient:ConnectionFailed', ...
                     'Failed to connect to Orthanc at %s: %s', ...

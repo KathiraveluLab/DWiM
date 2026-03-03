@@ -104,33 +104,34 @@ end
 
 % Convert to table format
 numStudies = numel(studyData);
-results = table();
-results.StudyID = cell(numStudies, 1);
-results.PatientID = cell(numStudies, 1);
-results.PatientName = cell(numStudies, 1);
-results.StudyDate = cell(numStudies, 1);
-results.StudyDescription = cell(numStudies, 1);
-results.Modality = cell(numStudies, 1);
-results.SeriesCount = zeros(numStudies, 1);
-results.InstanceCount = zeros(numStudies, 1);
-results.Series = cell(numStudies, 1);
+
+% Pre-allocate column vectors (assembled into table after the loop)
+col_StudyID = cell(numStudies, 1);
+col_PatientID = cell(numStudies, 1);
+col_PatientName = cell(numStudies, 1);
+col_StudyDate = cell(numStudies, 1);
+col_StudyDescription = cell(numStudies, 1);
+col_Modality = cell(numStudies, 1);
+col_SeriesCount = zeros(numStudies, 1);
+col_InstanceCount = zeros(numStudies, 1);
+col_Series = cell(numStudies, 1);
 
 for i = 1:numStudies
     study = studyData{i};
     
     % Extract study ID (handle both expanded and non-expanded results)
     if isfield(study, 'ID')
-        results.StudyID{i} = study.ID;
+        col_StudyID{i} = study.ID;
     end
     
     % Extract main DICOM tags
     if isfield(study, 'MainDicomTags')
         tags = study.MainDicomTags;
         if isfield(tags, 'StudyDate')
-            results.StudyDate{i} = tags.StudyDate;
+            col_StudyDate{i} = tags.StudyDate;
         end
         if isfield(tags, 'StudyDescription')
-            results.StudyDescription{i} = tags.StudyDescription;
+            col_StudyDescription{i} = tags.StudyDescription;
         end
     end
     
@@ -138,18 +139,18 @@ for i = 1:numStudies
     if isfield(study, 'PatientMainDicomTags')
         patTags = study.PatientMainDicomTags;
         if isfield(patTags, 'PatientID')
-            results.PatientID{i} = patTags.PatientID;
+            col_PatientID{i} = patTags.PatientID;
         end
         if isfield(patTags, 'PatientName')
-            results.PatientName{i} = patTags.PatientName;
+            col_PatientName{i} = patTags.PatientName;
         end
     end
     
     % Extract series information
     % Note: findStudies with Expand=true returns nested series data
     if isfield(study, 'Series') && ~isempty(study.Series)
-        results.Series{i} = study.Series;  % Store for batch operations
-        results.SeriesCount(i) = numel(study.Series);
+        col_Series{i} = study.Series;  % Store for batch operations
+        col_SeriesCount(i) = numel(study.Series);
         
         try
             % Extract series data consistently whether it's an array of structs, 
@@ -189,10 +190,10 @@ for i = 1:numStudies
             if modalityCount > 0
                 modalityList = modalityList(1:modalityCount);
                 uniqueModalities = unique(modalityList);
-                results.Modality{i} = strjoin(uniqueModalities, ', ');
+                col_Modality{i} = strjoin(uniqueModalities, ', ');
             end
             
-            results.InstanceCount(i) = totalInstances;
+            col_InstanceCount(i) = totalInstances;
         catch ME
             % Log warning if series metadata unavailable
             warning('queryOrthanc:SeriesMetadata', ...
@@ -201,6 +202,12 @@ for i = 1:numStudies
         end
     end
 end
+
+% Assemble table from column vectors in a single call
+results = table(col_StudyID, col_PatientID, col_PatientName, col_StudyDate, ...
+    col_StudyDescription, col_Modality, col_SeriesCount, col_InstanceCount, col_Series, ...
+    'VariableNames', {'StudyID', 'PatientID', 'PatientName', 'StudyDate', ...
+    'StudyDescription', 'Modality', 'SeriesCount', 'InstanceCount', 'Series'});
 
 % Apply sorting
 if options.SortBy ~= ""
