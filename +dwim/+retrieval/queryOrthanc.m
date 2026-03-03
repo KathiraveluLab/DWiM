@@ -67,6 +67,7 @@ if options.PatientName ~= ""
     query.PatientName = options.PatientName;
 end
 if options.Modality ~= ""
+    % Maps public 'Modality' option to Orthanc API field 'ModalitiesInStudy'
     query.ModalitiesInStudy = options.Modality;
 end
 if options.StudyDate ~= ""

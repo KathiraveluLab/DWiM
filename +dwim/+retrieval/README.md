@@ -147,7 +147,7 @@ results = dwim.retrieval.queryOrthanc(query);
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `ProcessVolumes` | logical | false | Build 3D volumes after download |
-| `AnonymizeBeforeSave` | logical | false | Anonymize files (requires anonymize module) |
+| `AnonymizeBeforeSave` | logical | false | *Planned feature* — anonymize files before saving (not yet implemented) |
 | `Parallel` | logical | true | Use parallel download |
 | `MaxStudies` | double | inf | Maximum studies to retrieve |
 | `Verbose` | logical | true | Display progress |

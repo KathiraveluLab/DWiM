@@ -25,8 +25,6 @@ classdef OrthancClient < handle
     
     properties (Access = private)
         BaseURL     string
-        Username    string
-        Password    string
         WebOptions  weboptions
         Verbose     logical
     end
@@ -43,14 +41,14 @@ classdef OrthancClient < handle
             end
             
             obj.BaseURL = options.BaseURL;
-            obj.Username = options.User;
-            obj.Password = options.Password;
             obj.Verbose = options.Verbose;
             
             % Create web options for all requests
+            % Credentials are stored only in weboptions to avoid retaining
+            % sensitive information as separate object properties
             obj.WebOptions = weboptions(...
-                'Username', obj.Username, ...
-                'Password', obj.Password, ...
+                'Username', options.User, ...
+                'Password', options.Password, ...
                 'MediaType', 'application/json', ...
                 'Timeout', options.Timeout, ...
                 'ContentType', 'json');

@@ -10,7 +10,7 @@ function summary = retrieveBatch(queryParams, outputDir, options)
 %
 %   Name-Value Arguments:
 %       ProcessVolumes    - Build 3D volumes after download (default: false)
-%                           Note: Only processes first series per study
+%                           Processes all series in each study
 %       Parallel          - Use parallel download (default: true)
 %       MaxStudies        - Maximum studies to retrieve (default: inf)
 %       Verbose           - Display progress (default: true)
@@ -178,7 +178,7 @@ else
                 try
                     options.OnStudyComplete(studyPath, studies(i,:));
                 catch callbackErr
-                    warning('User callback failed: %s', callbackErr.message);
+                    warning('User callback failed for study %s: %s', studyPath, callbackErr.message);
                 end
             end
             
@@ -229,29 +229,39 @@ if options.ProcessVolumes && summary.studiesDownloaded > 0
             seriesDirs = seriesDirs([seriesDirs.isdir]);
             
             if ~isempty(seriesDirs)
-                % Process first series only
-                % Note: Studies may contain multiple series (different sequences/planes)
-                % Currently only the first series is processed for volume building
-                if numel(seriesDirs) > 1 && options.Verbose
-                    warning('retrieveBatch:MultipleSeries', ...
-                        'Study has %d series, processing only the first', numel(seriesDirs));
+                % Process all series in the study
+                seriesVolumes = cell(numel(seriesDirs), 1);
+                
+                for s = 1:numel(seriesDirs)
+                    seriesPath = fullfile(studyPath, seriesDirs(s).name);
+                    
+                    try
+                        [volume, spacing, metadata] = ...
+                            dwim.preprocess3d.buildVolumeFromSeries(seriesPath, ...
+                            'Verbose', false);
+                        
+                        seriesVolumes{s} = struct(...
+                            'volume', volume, ...
+                            'spacing', spacing, ...
+                            'metadata', metadata, ...
+                            'path', seriesPath);
+                        
+                        if options.Verbose
+                            fprintf('  Processed volume %d series %d/%d: %dx%dx%d\n', ...
+                                i, s, numel(seriesDirs), ...
+                                size(volume,1), size(volume,2), size(volume,3));
+                        end
+                    catch seriesErr
+                        if options.Verbose
+                            fprintf('  Volume processing failed for study %d series %d: %s\n', ...
+                                i, s, seriesErr.message);
+                        end
+                    end
                 end
-                seriesPath = fullfile(studyPath, seriesDirs(1).name);
                 
-                [volume, spacing, metadata] = ...
-                    dwim.preprocess3d.buildVolumeFromSeries(seriesPath, ...
-                    'Verbose', false);
-                
-                summary.volumes{i} = struct(...
-                    'volume', volume, ...
-                    'spacing', spacing, ...
-                    'metadata', metadata, ...
-                    'path', seriesPath);
-                
-                if options.Verbose
-                    fprintf('  Processed volume %d: %dx%dx%d\n', ...
-                        i, size(volume,1), size(volume,2), size(volume,3));
-                end
+                % Store all successfully built volumes for this study
+                built = ~cellfun('isempty', seriesVolumes);
+                summary.volumes{i} = seriesVolumes(built);
             end
         catch ME
             if options.Verbose
