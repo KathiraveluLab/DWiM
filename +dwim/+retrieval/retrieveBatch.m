@@ -314,7 +314,8 @@ function [studyPath, seriesCount, fileCount, partials] = downloadStudy(client, s
     end
     seriesCount = numel(seriesList);
     fileCount = 0;
-    partials = {};  % Collect partial download info locally
+    partials = cell(seriesCount, 1);  % Pre-allocate for worst case
+    partialCount = 0;
     
     % Download each series
     for j = 1:seriesCount
@@ -338,13 +339,17 @@ function [studyPath, seriesCount, fileCount, partials] = downloadStudy(client, s
         
         % Record partial download failures locally
         if ~isempty(failedInst)
-            partials{end+1} = struct(...
+            partialCount = partialCount + 1;
+            partials{partialCount} = struct(...
                 'studyID', studyID, ...
                 'seriesID', seriesID, ...
-                'failedInstances', {failedInst}); %#ok<AGROW>
+                'failedInstances', {failedInst});
         end
         
         % Use download count returned by client instead of filesystem I/O
         fileCount = fileCount + dlCount;
     end
+    
+    % Trim pre-allocated array to actual count
+    partials = partials(1:partialCount);
 end

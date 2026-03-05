@@ -237,7 +237,8 @@ classdef OrthancClient < handle
             end
             
             % Track failed downloads
-            failedInstances = {};
+            failedInstances = cell(numel(instances), 1);
+            failureCount = 0;
             downloadCount = 0;
             
             % Download each instance
@@ -265,10 +266,14 @@ classdef OrthancClient < handle
                         fprintf('  Downloaded %d/%d instances\n', i, numel(instances));
                     end
                 catch ME
-                    failedInstances{end+1} = instanceID; %#ok<AGROW>
+                    failureCount = failureCount + 1;
+                    failedInstances{failureCount} = instanceID;
                     warning('Failed to download instance %s: %s', instanceID, ME.message);
                 end
             end
+            
+            % Trim pre-allocated array to actual failure count
+            failedInstances = failedInstances(1:failureCount);
             
             filepath = seriesDir;
             

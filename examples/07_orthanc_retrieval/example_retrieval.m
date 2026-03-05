@@ -142,11 +142,14 @@ try
     % Display volume information
     for i = 1:numel(summary.volumes)
         if ~isempty(summary.volumes{i})
-            vol = summary.volumes{i};
-            sz = size(vol.volume);
-            fprintf('    Volume %d: %dx%dx%d, spacing: [%.2f %.2f %.2f]mm\n', ...
-                i, sz(1), sz(2), sz(3), ...
-                vol.spacing(1), vol.spacing(2), vol.spacing(3));
+            studyVolumes = summary.volumes{i};
+            for j = 1:numel(studyVolumes)
+                vol = studyVolumes{j};
+                sz = size(vol.volume);
+                fprintf('    Study %d, Volume %d: %dx%dx%d, spacing: [%.2f %.2f %.2f]mm\n', ...
+                    i, j, sz(1), sz(2), sz(3), ...
+                    vol.spacing(1), vol.spacing(2), vol.spacing(3));
+            end
         end
     end
     

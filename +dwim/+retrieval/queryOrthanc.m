@@ -170,6 +170,9 @@ for i = 1:numStudies
                 
                 % If it's just an ID string, fetch the expanded struct
                 if ischar(seriesObj) || isstring(seriesObj)
+                    warning('queryOrthanc:SeriesFallback', ...
+                        'Series data not expanded for study %s; fetching individually (may be slow for large result sets)', ...
+                        study.ID);
                     seriesObj = client.getSeries(seriesObj);
                 end
                 
