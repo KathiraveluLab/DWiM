@@ -49,6 +49,9 @@ if options.Verbose
     fprintf('Output directory: %s\n', outputDir);
 end
 
+% Validate and resolve output directory to prevent path traversal
+outputDir = string(java.io.File(char(outputDir)).getCanonicalPath());
+
 % Create output directory
 if ~exist(outputDir, 'dir')
     mkdir(outputDir);
@@ -128,8 +131,23 @@ if options.Parallel && numStudies > 1
         try
             % Each worker creates its own client (skip connection test; validated above)
             workerClient = dwim.retrieval.OrthancClient('Verbose', false, 'TestConnection', false);
-            [studyPaths{i}, seriesCounts(i), fileCounts(i), allPartials{i}] = ...
+            [studyPath, sCount, fCount, pList] = ...
                 downloadStudy(workerClient, studies(i,:), outputDir, options);
+            
+            % Assign to sliced output variables
+            studyPaths{i} = studyPath;
+            seriesCounts(i) = sCount;
+            fileCounts(i) = fCount;
+            allPartials{i} = pList;
+            
+            % Call user callback if provided (consistent with serial path)
+            if ~isempty(options.OnStudyComplete) && ~isempty(studyPath)
+                try
+                    options.OnStudyComplete(studyPath, studies(i,:));
+                catch callbackErr
+                    errors{i} = sprintf('Callback failed: %s', callbackErr.message);
+                end
+            end
         catch ME
             errors{i} = ME.message;
         end

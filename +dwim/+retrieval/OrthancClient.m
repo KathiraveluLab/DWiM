@@ -105,6 +105,7 @@ classdef OrthancClient < handle
                 obj
                 patientID (1,1) string
             end
+            patientID = obj.sanitizeResourceID(patientID);
             url = obj.BaseURL + "/patients/" + patientID;
             patient = webread(url, obj.WebOptions);
         end
@@ -115,6 +116,7 @@ classdef OrthancClient < handle
                 obj
                 studyID (1,1) string
             end
+            studyID = obj.sanitizeResourceID(studyID);
             url = obj.BaseURL + "/studies/" + studyID;
             study = webread(url, obj.WebOptions);
         end
@@ -125,6 +127,7 @@ classdef OrthancClient < handle
                 obj
                 seriesID (1,1) string
             end
+            seriesID = obj.sanitizeResourceID(seriesID);
             url = obj.BaseURL + "/series/" + seriesID;
             series = webread(url, obj.WebOptions);
         end
@@ -135,6 +138,7 @@ classdef OrthancClient < handle
                 obj
                 instanceID (1,1) string
             end
+            instanceID = obj.sanitizeResourceID(instanceID);
             url = obj.BaseURL + "/instances/" + instanceID;
             instance = webread(url, obj.WebOptions);
         end
@@ -268,7 +272,8 @@ classdef OrthancClient < handle
                 outputFile = fullfile(seriesDir, filename);
                 
                 % Download DICOM file
-                url = obj.BaseURL + "/instances/" + instanceID + "/file";
+                safeInstanceID = obj.sanitizeResourceID(instanceID);
+                url = obj.BaseURL + "/instances/" + safeInstanceID + "/file";
                 
                 try
                     % Use websave for binary file download
@@ -312,15 +317,12 @@ classdef OrthancClient < handle
                 outputPath (1,1) string = "series.zip"
             end
             
+            seriesID = obj.sanitizeResourceID(seriesID);
             url = obj.BaseURL + "/series/" + seriesID + "/archive";
             
-            % Sanitize output path — ensure it stays under the intended directory
-            [outDir, outName, outExt] = fileparts(outputPath);
-            if outDir == ""
-                outDir = ".";
-            end
-            safeOutputPath = fullfile(outDir, ...
-                [regexprep(char(outName), '[/\\:.*?"<>|]', '_'), char(outExt)]);
+            % Resolve and validate output path to prevent traversal
+            absOutputPath = char(java.io.File(char(outputPath)).getCanonicalPath());
+            safeOutputPath = string(absOutputPath);
             
             if obj.Verbose
                 fprintf('Downloading series %s as ZIP archive...\n', seriesID);
@@ -349,6 +351,19 @@ classdef OrthancClient < handle
                     'Failed to connect to Orthanc at %s: %s', ...
                     obj.BaseURL, ME.message);
             end
+        end
+    end
+    
+    methods (Static, Access = private)
+        function safeID = sanitizeResourceID(resourceID)
+            %SANITIZERESOURCEID Strip path traversal characters from an Orthanc resource ID
+            %   Orthanc UUIDs are hex+dash only; reject anything with / \ or ..
+            safeID = regexprep(char(resourceID), '[/\\%.]+', '');
+            if isempty(safeID)
+                error('OrthancClient:InvalidResourceID', ...
+                    'Resource ID is empty after sanitization: %s', resourceID);
+            end
+            safeID = string(safeID);
         end
     end
 end
