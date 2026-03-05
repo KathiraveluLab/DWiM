@@ -38,6 +38,7 @@ classdef OrthancClient < handle
                 options.Password (1,1) string = dwim.config().Orthanc.Password
                 options.Verbose (1,1) logical = false
                 options.Timeout (1,1) double {mustBePositive} = 30
+                options.TestConnection (1,1) logical = true
             end
             
             obj.BaseURL = options.BaseURL;
@@ -54,10 +55,12 @@ classdef OrthancClient < handle
                 'ContentType', 'json');
             
             % Test connection
-            if obj.Verbose
-                fprintf('OrthancClient: Testing connection to %s...\n', obj.BaseURL);
+            if options.TestConnection
+                if obj.Verbose
+                    fprintf('OrthancClient: Testing connection to %s...\n', obj.BaseURL);
+                end
+                obj.testConnection();
             end
-            obj.testConnection();
         end
         
         function info = getSystemInfo(obj)
@@ -211,6 +214,10 @@ classdef OrthancClient < handle
             % Get series metadata to find instances
             try
                 seriesInfo = obj.getSeries(seriesID);
+                if ~isfield(seriesInfo, 'Instances')
+                    error('OrthancClient:InvalidResponse', ...
+                        'Series metadata for %s does not contain an "Instances" field.', seriesID);
+                end
                 instances = seriesInfo.Instances;
             catch ME
                 warning('Failed to retrieve series metadata for %s: %s', seriesID, ME.message);
@@ -222,7 +229,9 @@ classdef OrthancClient < handle
             
             % Create output directory
             if options.CreateSubdir
-                seriesDir = fullfile(outputDir, seriesID);
+                % Sanitize seriesID to prevent path traversal
+                safeSeriesID = regexprep(char(seriesID), '[/\\:.*?"<>|]', '_');
+                seriesDir = fullfile(outputDir, safeSeriesID);
             else
                 seriesDir = outputDir;
             end
@@ -251,6 +260,10 @@ classdef OrthancClient < handle
                 else
                     filename = sprintf(options.Filename, i);
                 end
+                
+                % Sanitize filename to prevent path traversal
+                [~, fname, fext] = fileparts(filename);
+                filename = [regexprep(char(fname), '[/\\:.*?"<>|]', '_'), char(fext)];
                 
                 outputFile = fullfile(seriesDir, filename);
                 
@@ -301,12 +314,20 @@ classdef OrthancClient < handle
             
             url = obj.BaseURL + "/series/" + seriesID + "/archive";
             
+            % Sanitize output path — ensure it stays under the intended directory
+            [outDir, outName, outExt] = fileparts(outputPath);
+            if outDir == ""
+                outDir = ".";
+            end
+            safeOutputPath = fullfile(outDir, ...
+                [regexprep(char(outName), '[/\\:.*?"<>|]', '_'), char(outExt)]);
+            
             if obj.Verbose
                 fprintf('Downloading series %s as ZIP archive...\n', seriesID);
             end
             
             try
-                archive = websave(outputPath, url, obj.WebOptions);
+                archive = websave(safeOutputPath, url, obj.WebOptions);
                 
                 if obj.Verbose
                     fprintf('Archive saved: %s\n', archive);

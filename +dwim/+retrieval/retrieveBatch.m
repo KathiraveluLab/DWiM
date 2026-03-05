@@ -126,8 +126,8 @@ if options.Parallel && numStudies > 1
     
     parfor i = 1:numStudies
         try
-            % Each worker creates its own client instance
-            workerClient = dwim.retrieval.OrthancClient('Verbose', false);
+            % Each worker creates its own client (skip connection test; validated above)
+            workerClient = dwim.retrieval.OrthancClient('Verbose', false, 'TestConnection', false);
             [studyPaths{i}, seriesCounts(i), fileCounts(i), allPartials{i}] = ...
                 downloadStudy(workerClient, studies(i,:), outputDir, options);
         catch ME
