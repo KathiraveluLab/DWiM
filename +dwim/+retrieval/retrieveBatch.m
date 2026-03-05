@@ -14,7 +14,10 @@ function summary = retrieveBatch(queryParams, outputDir, options)
 %       Parallel          - Use parallel download (default: true)
 %       MaxStudies        - Maximum studies to retrieve (default: inf)
 %       Verbose           - Display progress (default: true)
-%       OnStudyComplete   - Callback function handle (default: [])
+%       OnStudyComplete   - Callback function handle (default: []).
+%                           Note: when Parallel=true, the callback executes
+%                           inside a parfor worker and must be thread-safe
+%                           (no shared mutable state or global side effects).
 %
 %   Returns:
 %      summary - Struct with download statistics and file paths
@@ -61,6 +64,14 @@ end
 if ~exist(outputDir, 'dir')
     mkdir(outputDir);
 end
+
+% Post-mkdir TOCTOU guard: re-resolve after creation and re-validate
+resolvedOutputDir = string(java.io.File(char(outputDir)).getCanonicalPath());
+if ~startsWith(char(resolvedOutputDir), char(currentDir))
+    error('RetrieveBatch:InvalidPath', ...
+        'Output directory resolved outside allowed directory after creation: %s', resolvedOutputDir);
+end
+outputDir = resolvedOutputDir;
 
 % Initialize summary
 summary = struct();

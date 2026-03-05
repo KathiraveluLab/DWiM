@@ -40,7 +40,8 @@ arguments
     options.StudyDescription (1,1) string = ""
     options.Limit (1,1) double {mustBePositive} = inf
     options.SortBy (1,1) string {mustBeMember(options.SortBy, ...
-        ["", "StudyDate", "PatientName", "Modality"])} = ""
+        ["", "StudyID", "PatientID", "PatientName", "StudyDate", ...
+         "StudyDescription", "Modality", "SeriesCount"])} = ""
     options.SortOrder (1,1) string {mustBeMember(options.SortOrder, ...
         ["ascend", "descend"])} = "descend"
     options.Verbose (1,1) logical = false

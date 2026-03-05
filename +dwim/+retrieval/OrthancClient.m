@@ -215,6 +215,15 @@ classdef OrthancClient < handle
                 options.Filename (1,1) string = ""
             end
             
+            % Validate outputDir to prevent path traversal
+            absOutputDir = char(java.io.File(char(outputDir)).getCanonicalPath());
+            currentDir   = char(java.io.File(pwd).getCanonicalPath());
+            if ~startsWith(absOutputDir, currentDir)
+                error('OrthancClient:InvalidPath', ...
+                    'outputDir must be within the current working directory: %s', absOutputDir);
+            end
+            outputDir = string(absOutputDir);
+            
             % Get series metadata to find instances
             try
                 seriesInfo = obj.getSeries(seriesID);
@@ -335,6 +344,14 @@ classdef OrthancClient < handle
             
             try
                 archive = websave(safeOutputPath, url, obj.WebOptions);
+                
+                % Post-write TOCTOU guard: re-resolve the written file and re-validate
+                actualPath = char(java.io.File(char(archive)).getCanonicalPath());
+                if ~startsWith(actualPath, currentDir)
+                    delete(archive);
+                    error('OrthancClient:InvalidPath', ...
+                        'Written archive resolved outside allowed directory; file removed.');
+                end
                 
                 if obj.Verbose
                     fprintf('Archive saved: %s\n', archive);
