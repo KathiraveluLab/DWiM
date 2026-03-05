@@ -51,6 +51,11 @@ end
 
 % Validate and resolve output directory to prevent path traversal
 outputDir = string(java.io.File(char(outputDir)).getCanonicalPath());
+currentDir = string(java.io.File(pwd).getCanonicalPath());
+if ~startsWith(char(outputDir), char(currentDir))
+    error('RetrieveBatch:InvalidPath', ...
+        'Output directory must be within the current working directory: %s', outputDir);
+end
 
 % Create output directory
 if ~exist(outputDir, 'dir')

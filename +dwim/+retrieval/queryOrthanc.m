@@ -216,8 +216,8 @@ results = table(col_StudyID, col_PatientID, col_PatientName, col_StudyDate, ...
 if options.SortBy ~= ""
     try
         results = sortrows(results, options.SortBy, options.SortOrder);
-    catch
-        warning('Failed to sort by %s, returning unsorted results', options.SortBy);
+    catch ME
+        warning('Failed to sort by "%s": %s. Returning unsorted results.', options.SortBy, ME.message);
     end
 end
 

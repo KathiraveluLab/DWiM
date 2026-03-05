@@ -322,6 +322,11 @@ classdef OrthancClient < handle
             
             % Resolve and validate output path to prevent traversal
             absOutputPath = char(java.io.File(char(outputPath)).getCanonicalPath());
+            currentDir   = char(java.io.File(pwd).getCanonicalPath());
+            if ~startsWith(absOutputPath, currentDir)
+                error('OrthancClient:InvalidPath', ...
+                    'Output path must be within the current working directory: %s', absOutputPath);
+            end
             safeOutputPath = string(absOutputPath);
             
             if obj.Verbose
@@ -356,12 +361,12 @@ classdef OrthancClient < handle
     
     methods (Static, Access = private)
         function safeID = sanitizeResourceID(resourceID)
-            %SANITIZERESOURCEID Strip path traversal characters from an Orthanc resource ID
-            %   Orthanc UUIDs are hex+dash only; reject anything with / \ or ..
-            safeID = regexprep(char(resourceID), '[/\\%.]+', '');
+            %SANITIZERESOURCEID Validate an Orthanc resource ID using a whitelist
+            %   Orthanc UUIDs are hex+dash only; strip everything else.
+            safeID = regexprep(char(resourceID), '[^a-fA-F0-9-]', '');
             if isempty(safeID)
                 error('OrthancClient:InvalidResourceID', ...
-                    'Resource ID is empty after sanitization: %s', resourceID);
+                    'Resource ID is empty or contains only invalid characters: %s', resourceID);
             end
             safeID = string(safeID);
         end
