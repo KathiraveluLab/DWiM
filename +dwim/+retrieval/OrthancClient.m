@@ -218,7 +218,8 @@ classdef OrthancClient < handle
             % Validate outputDir to prevent path traversal
             absOutputDir = char(java.io.File(char(outputDir)).getCanonicalPath());
             currentDir   = char(java.io.File(pwd).getCanonicalPath());
-            if ~startsWith(absOutputDir, currentDir)
+            sep          = char(java.io.File.separator);
+            if ~startsWith([absOutputDir, sep], [currentDir, sep])
                 error('OrthancClient:InvalidPath', ...
                     'outputDir must be within the current working directory: %s', absOutputDir);
             end
@@ -252,6 +253,14 @@ classdef OrthancClient < handle
             if ~exist(seriesDir, 'dir')
                 mkdir(seriesDir);
             end
+            
+            % Post-mkdir TOCTOU guard: re-resolve and re-validate
+            resolvedSeriesDir = char(java.io.File(char(seriesDir)).getCanonicalPath());
+            if ~startsWith([resolvedSeriesDir, sep], [currentDir, sep])
+                error('OrthancClient:InvalidPath', ...
+                    'Series directory resolved outside allowed directory after creation: %s', resolvedSeriesDir);
+            end
+            seriesDir = string(resolvedSeriesDir);
             
             if obj.Verbose
                 fprintf('Downloading %d instances from series %s...\n', ...
@@ -332,7 +341,8 @@ classdef OrthancClient < handle
             % Resolve and validate output path to prevent traversal
             absOutputPath = char(java.io.File(char(outputPath)).getCanonicalPath());
             currentDir   = char(java.io.File(pwd).getCanonicalPath());
-            if ~startsWith(absOutputPath, currentDir)
+            sep          = char(java.io.File.separator);
+            if ~startsWith([absOutputPath, sep], [currentDir, sep])
                 error('OrthancClient:InvalidPath', ...
                     'Output path must be within the current working directory: %s', absOutputPath);
             end
@@ -347,7 +357,7 @@ classdef OrthancClient < handle
                 
                 % Post-write TOCTOU guard: re-resolve the written file and re-validate
                 actualPath = char(java.io.File(char(archive)).getCanonicalPath());
-                if ~startsWith(actualPath, currentDir)
+                if ~startsWith([actualPath, sep], [currentDir, sep])
                     delete(archive);
                     error('OrthancClient:InvalidPath', ...
                         'Written archive resolved outside allowed directory; file removed.');

@@ -55,7 +55,8 @@ end
 % Validate and resolve output directory to prevent path traversal
 outputDir = string(java.io.File(char(outputDir)).getCanonicalPath());
 currentDir = string(java.io.File(pwd).getCanonicalPath());
-if ~startsWith(char(outputDir), char(currentDir))
+sep = char(java.io.File.separator);
+if ~startsWith([char(outputDir), sep], [char(currentDir), sep])
     error('RetrieveBatch:InvalidPath', ...
         'Output directory must be within the current working directory: %s', outputDir);
 end
@@ -67,7 +68,7 @@ end
 
 % Post-mkdir TOCTOU guard: re-resolve after creation and re-validate
 resolvedOutputDir = string(java.io.File(char(outputDir)).getCanonicalPath());
-if ~startsWith(char(resolvedOutputDir), char(currentDir))
+if ~startsWith([char(resolvedOutputDir), sep], [char(currentDir), sep])
     error('RetrieveBatch:InvalidPath', ...
         'Output directory resolved outside allowed directory after creation: %s', resolvedOutputDir);
 end
