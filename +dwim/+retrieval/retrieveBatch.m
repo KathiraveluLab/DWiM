@@ -338,6 +338,16 @@ function [studyPath, seriesCount, fileCount, partials] = downloadStudy(client, s
         mkdir(studyPath);
     end
     
+    % Post-mkdir TOCTOU guard: re-resolve and confirm within baseDir
+    sep = char(java.io.File.separator);
+    resolvedStudyPath = char(java.io.File(char(studyPath)).getCanonicalPath());
+    resolvedBaseDir   = char(java.io.File(char(baseDir)).getCanonicalPath());
+    if ~startsWith([resolvedStudyPath, sep], [resolvedBaseDir, sep])
+        error('RetrieveBatch:InvalidPath', ...
+            'Study directory resolved outside allowed base directory after creation: %s', resolvedStudyPath);
+    end
+    studyPath = string(resolvedStudyPath);
+    
     % Get series list from study table (avoids N+1 API call)
     if ~isempty(study.Series{1})
         % Use series data from queryOrthanc result

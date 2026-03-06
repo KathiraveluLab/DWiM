@@ -57,7 +57,8 @@ classdef OrthancClient < handle
             % Test connection
             if options.TestConnection
                 if obj.Verbose
-                    fprintf('OrthancClient: Testing connection to %s...\n', obj.BaseURL);
+                    fprintf('OrthancClient: Testing connection to %s...\n', ...
+                        dwim.retrieval.OrthancClient.sanitizeURL(obj.BaseURL));
                 end
                 obj.testConnection();
             end
@@ -355,12 +356,13 @@ classdef OrthancClient < handle
             try
                 archive = websave(safeOutputPath, url, obj.WebOptions);
                 
-                % Post-write TOCTOU guard: re-resolve the written file and re-validate
+                % Post-write TOCTOU guard: re-resolve the written file and re-validate.
+                % Do NOT delete on failure — deleting via a resolved path could remove
+                % an unrelated file if a symlink was swapped in after the pre-write check.
                 actualPath = char(java.io.File(char(archive)).getCanonicalPath());
                 if ~startsWith([actualPath, sep], [currentDir, sep])
-                    delete(archive);
                     error('OrthancClient:InvalidPath', ...
-                        'Written archive resolved outside allowed directory; file removed.');
+                        'Written archive resolved outside allowed directory: %s', actualPath);
                 end
                 
                 if obj.Verbose
@@ -381,7 +383,7 @@ classdef OrthancClient < handle
             catch ME
                 error('OrthancClient:ConnectionFailed', ...
                     'Failed to connect to Orthanc at %s: %s', ...
-                    obj.BaseURL, ME.message);
+                    dwim.retrieval.OrthancClient.sanitizeURL(obj.BaseURL), ME.message);
             end
         end
     end
@@ -396,6 +398,14 @@ classdef OrthancClient < handle
                     'Resource ID is empty or contains only invalid characters: %s', resourceID);
             end
             safeID = string(safeID);
+        end
+        
+        function safe = sanitizeURL(url)
+            %SANITIZEURL Strip embedded credentials from a URL before logging
+            %   Removes the userinfo component (user:pass@) to prevent
+            %   credential leakage in log output or error messages.
+            safe = regexprep(char(url), '(https?://)([^@/]+@)', '$1');
+            safe = string(safe);
         end
     end
 end
