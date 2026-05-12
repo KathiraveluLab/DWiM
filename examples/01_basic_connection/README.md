@@ -1,6 +1,6 @@
 # Example 1: Basic Orthanc Connection
 
-## 🎯 Purpose
+## Purpose
 
 This example demonstrates the fundamental first step of the DWiM project:
 connecting to a PACS server (Orthanc) via its REST API and retrieving study
@@ -10,7 +10,7 @@ This script (`connect_and_fetch.m`) serves as the "Hello, World!" for
 Phase 1 of the project, proving the MATLAB environment can successfully
 communicate with the image server.
 
-## ⚙️ Setup Instructions
+## Setup Instructions
 
 To run this example, you must have a running Orthanc server populated with
 test data.
@@ -35,7 +35,7 @@ test data.
     * Log in (default: `orthanc` / `orthanc`).
     * Use the "Upload" button to add your sample `.dcm` files.
 
-## 🏃 How to Run
+## How to Run
 
 1.  Open MATLAB.
 2.  Navigate to this directory (`examples/01_basic_connection/`).
@@ -45,7 +45,7 @@ test data.
     connect_and_fetch
     ```
 
-## ✅ Expected Output
+## Expected Output
 
 If successful, you will see output in the command window similar to this
 (the Patient Name will match the data you uploaded):

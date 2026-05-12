@@ -4,6 +4,17 @@ function conf = config()
 %   conf = dwim.config() returns a struct containing default settings
 %   for Orthanc connections, file paths, and other project-wide constants.
 %
+%   Outputs:
+%       conf - (struct) Configuration structure with fields:
+%           .Orthanc.BaseURL  - Default Orthanc server URL
+%           .Orthanc.User     - Default username
+%           .Orthanc.Password - Default password
+%           .Defaults.Verbose - Default verbosity setting
+%
+%   Example:
+%       settings = dwim.config();
+%       disp(settings.Orthanc.BaseURL);
+%
 %   Note: Uses Singleton Pattern (persistent variable) for performance.
 
     persistent cachedConf;
