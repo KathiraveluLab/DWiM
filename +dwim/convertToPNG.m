@@ -66,10 +66,17 @@ function outputPath = convertToPNG(inputFile, outputDir, options)
     % 4. Read DICOM image and metadata
     try
         img = dicomread(inputFile);
-        info = dicominfo(inputFile);
     catch ME
         error('dwim:convertToPNG:ReadFailed', ...
-              'Failed to read DICOM file: %s', ME.message);
+              'Failed to read DICOM image data: %s', ME.message);
+    end
+    
+    try
+        info = dicominfo(inputFile);
+    catch ME
+        warning('dwim:convertToPNG:MetadataReadFailed', ...
+              'Failed to read metadata from %s. Using default metadata.', inputFile);
+        info = struct();
     end
 
     % 5. Convert to double for processing
