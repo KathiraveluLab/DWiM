@@ -105,7 +105,7 @@ classdef test_convertToPNG < matlab.unittest.TestCase
                 OutputName=customName);
             
             [~, actualName, ~] = fileparts(outputPath);
-            testCase.verifyEqual(actualName, customName, 'Output should use custom name');
+            testCase.verifyEqual(string(actualName), string(customName), 'Output should use custom name');
         end
     end
 end
