@@ -1,12 +1,11 @@
-function cfg = config()
-%CONFIG Returns the default configuration for DWiM.
+function conf = config()
+%config Returns the central configuration settings for DWiM.
 %
-%   cfg = dwim.config()
-%       Returns a structure containing default settings for Orthanc
-%       connection and general DWiM behavior.
+%   conf = dwim.config() returns a struct containing default settings
+%   for Orthanc connections, file paths, and other project-wide constants.
 %
 %   Outputs:
-%       cfg - (struct) Configuration structure with fields:
+%       conf - (struct) Configuration structure with fields:
 %           .Orthanc.BaseURL  - Default Orthanc server URL
 %           .Orthanc.User     - Default username
 %           .Orthanc.Password - Default password
@@ -15,30 +14,30 @@ function cfg = config()
 %   Example:
 %       settings = dwim.config();
 %       disp(settings.Orthanc.BaseURL);
+%
+%   Note: Uses Singleton Pattern (persistent variable) for performance.
 
-    % Orthanc server configuration
-    % Load from environment variables with fallback defaults
-    baseURL = getenv('DWIM_ORTHANC_BASEURL');
-    if isempty(baseURL)
-        cfg.Orthanc.BaseURL = "http://localhost:8042";
-    else
-        cfg.Orthanc.BaseURL = string(baseURL);
+    persistent cachedConf;
+
+    if isempty(cachedConf)
+        % --- Orthanc Settings ---
+        % Use a helper to check environment variables 
+        cachedConf.Orthanc.BaseURL  = getEnvOrDefault('DWIM_ORTHANC_BASEURL', "http://localhost:8042");
+        cachedConf.Orthanc.User     = getEnvOrDefault('DWIM_ORTHANC_USER', "orthanc");
+        cachedConf.Orthanc.Password = getEnvOrDefault('DWIM_ORTHANC_PASSWORD', "orthanc");
+
+        % --- Default Behaviors ---
+        cachedConf.Defaults.Verbose = true;
     end
-    
-    user = getenv('DWIM_ORTHANC_USER');
-    if isempty(user)
-        cfg.Orthanc.User = "orthanc";
-    else
-        cfg.Orthanc.User = string(user);
+
+    % Return the cached configuration
+    conf = cachedConf;
+end
+
+function val = getEnvOrDefault(envKey, defaultVal)
+%getEnvOrDefault Helper to read env var safely
+    val = string(getenv(envKey));
+    if val == ""
+        val = string(defaultVal);
     end
-    
-    password = getenv('DWIM_ORTHANC_PASSWORD');
-    if isempty(password)
-        cfg.Orthanc.Password = "orthanc";
-    else
-        cfg.Orthanc.Password = string(password);
-    end
-    
-    % Default behavior settings
-    cfg.Defaults.Verbose = true;
 end
